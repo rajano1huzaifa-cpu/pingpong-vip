@@ -499,6 +499,7 @@ canvas#pong{background:#04170f; border-radius:10px; touch-action:none; max-width
         <div class="card">
           <h3>Account & Data</h3>
           <p class="muted" style="font-size:12.5px;">Your progress is encrypted at rest and synced to the cloud automatically whenever you play — log in from any device to pick up exactly where you left off.</p>
+          <button class="btn ghost block" style="margin-top:10px;" onclick="Settings.changePasswordPrompt()">Change Password</button>
           <button class="btn ghost block" onclick="Auth.logout()">Log Out</button>
         </div>
         <div class="card">
@@ -1214,6 +1215,25 @@ const Inventory = {
 
 /* ---------------- Settings ---------------- */
 const Settings = {
+    changePasswordPrompt(){
+    modal(`<h3>Change Password</h3>
+      <input id="cpCurrent" type="password" placeholder="Current password" style="width:100%; padding:11px; margin:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+      <input id="cpNew" type="password" placeholder="New password" style="width:100%; padding:11px; margin:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+      <p id="cpError" style="color:var(--danger); font-size:12.5px; min-height:16px;"></p>
+      <div class="grid cols-2">
+        <button class="btn ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn primary" onclick="Settings.submitPasswordChange()">Update</button>
+      </div>`);
+  },
+  async submitPasswordChange(){
+    const currentPassword = document.getElementById('cpCurrent').value;
+    const newPassword = document.getElementById('cpNew').value;
+    try{
+      await apiCall('/api/change-password','POST',{currentPassword,newPassword},true);
+      closeModal();
+      toast('Password updated successfully.');
+    }catch(e){ document.getElementById('cpError').textContent = e.message; }
+  },
   toggle(key){
     STATE.settings[key] = !STATE.settings[key];
     document.getElementById('sw'+key[0].toUpperCase()+key.slice(1)).classList.toggle('on', STATE.settings[key]);
