@@ -771,8 +771,7 @@ const Auth = {
     // backfill any new fields for older saves, prefer an on-device cache if it's newer looking
     const cached = LocalCache.load(player.username);
     const fresh = newPlayer(player.username);
-    const base = Object.assign(fresh, cached && cached.level>=player.level ? cached : player, player.isAdmin?{isAdmin:true}:{});
-    STATE = base;
+    const base = const base = Object.assign(fresh, player);
     STATE.stats = Object.assign(fresh.stats, player.stats||{});
     STATE.inventory = Object.assign(fresh.inventory, player.inventory||{});
     STATE.equipped = Object.assign(fresh.equipped, player.equipped||{});
