@@ -881,7 +881,20 @@ const AdminPanel = {
     const coins = Number(document.getElementById('adminGrantCoins').value)||0;
     const gems = Number(document.getElementById('adminGrantGems').value)||0;
     if(!username) return toast('Enter a username.');
-    try{ await apiCall('/api/admin/grant','POST',{username,coins,gems},true); toast('Granted to '+username); this.load(); }
+    try{
+  await apiCall('/api/admin/grant','POST',{username,coins,gems},true);
+
+  if(username.toLowerCase() === CURRENT_USER.toLowerCase()){
+    const data = await apiCall('/api/me','GET',null,true);
+    STATE.coins = data.player.coins;
+    STATE.gems = data.player.gems;
+    LocalCache.save(STATE.username, STATE);
+    UI.renderTop();
+  }
+
+  toast('Granted to '+username);
+  this.load();
+}
     catch(e){ toast(e.message); }
   },
   async ban(banned){
