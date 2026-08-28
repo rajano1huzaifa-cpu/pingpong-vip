@@ -186,7 +186,16 @@ app.put('/api/me', auth, (req, res) => {
     .run(JSON.stringify(merged), merged.rating, now, row.id);
   res.json({ ok: true, player: { ...merged, isAdmin: !!row.is_admin } });
 });
-
+app.post('/api/change-password', auth, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 4) return res.status(400).json({ error: 'New password must be at least 4 characters.' });
+  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.uid);
+  if (!row) return res.status(404).json({ error: 'Account not found.' });
+  if (!bcrypt.compareSync(currentPassword || '', row.password_hash)) return res.status(401).json({ error: 'Current password is incorrect.' });
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, row.id);
+  res.json({ ok: true });
+});
 // ---------------------------------------------------------------------------
 // Leaderboard
 // ---------------------------------------------------------------------------
