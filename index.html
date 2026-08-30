@@ -1,0 +1,2335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ping Pong VIP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Teko:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+:root{
+  --bg:#080b14;
+  --bg-elev:#101728;
+  --bg-elev-2:#161f36;
+  --line:#232e4a;
+  --table:#0fa968;
+  --table-dark:#0a7a4d;
+  --paddle:#ff4757;
+  --blue:#4da8ff;
+  --gold:#f5b841;
+  --gold-dim:#8a6c2c;
+  --text:#eaf0ff;
+  --text-dim:#8a93a8;
+  --danger:#ff5c5c;
+  --good:#3ddc84;
+  --radius:14px;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  margin:0; background:radial-gradient(1200px 800px at 50% -10%, #101a30 0%, var(--bg) 55%) fixed;
+  color:var(--text); font-family:'Inter',sans-serif; overflow:hidden; user-select:none;
+}
+.font-display{font-family:'Teko',sans-serif; letter-spacing:.02em;}
+.scoreboard{font-family:'Rajdhani',sans-serif; font-weight:700; letter-spacing:.04em;}
+
+#app{position:fixed; inset:0; display:flex; flex-direction:column;}
+
+/* ---------- Top bar ---------- */
+#topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 14px; background:linear-gradient(180deg, rgba(16,23,40,.95), rgba(16,23,40,.75));
+  border-bottom:1px solid var(--line); backdrop-filter:blur(6px); z-index:20;
+}
+.brand{display:flex; align-items:center; gap:8px; font-family:'Teko',sans-serif; font-size:26px; font-weight:700;}
+.brand .ball{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #fff, var(--table) 60%); box-shadow:0 0 10px var(--table);}
+.brand .vip{color:var(--gold); font-size:15px; border:1px solid var(--gold-dim); padding:1px 6px; border-radius:6px; margin-left:2px; font-family:'Inter'; letter-spacing:.08em;}
+#topStats{display:flex; align-items:center; gap:10px; font-size:13px;}
+.pill{display:flex; align-items:center; gap:5px; background:var(--bg-elev-2); border:1px solid var(--line); padding:5px 10px; border-radius:999px;}
+.pill.coins{color:var(--gold);}
+.pill.gems{color:var(--blue);}
+.lvl-badge{width:24px;height:24px;border-radius:50%;background:conic-gradient(var(--table) calc(var(--p,0)*1%), var(--line) 0); display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+.lvl-badge span{background:var(--bg-elev); width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+
+/* ---------- Screens ---------- */
+#screens{flex:1; overflow-y:auto; position:relative;}
+.screen{display:none; padding:16px 16px 90px; max-width:900px; margin:0 auto; animation:fadeIn .25s ease;}
+.screen.active{display:block;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+h1.page-title{font-family:'Teko'; font-size:34px; font-weight:600; margin:4px 0 14px; display:flex; align-items:center; gap:10px;}
+h1.page-title .bar{width:5px;height:26px;background:var(--table); border-radius:3px;}
+
+.card{background:var(--bg-elev); border:1px solid var(--line); border-radius:var(--radius); padding:16px; margin-bottom:14px; box-shadow:var(--shadow);}
+.card h3{margin:0 0 10px; font-family:'Teko'; font-weight:600; font-size:20px; letter-spacing:.02em;}
+.grid{display:grid; gap:12px;}
+.grid.cols-2{grid-template-columns:1fr 1fr;}
+.grid.cols-3{grid-template-columns:repeat(3,1fr);}
+@media(max-width:560px){.grid.cols-3{grid-template-columns:repeat(2,1fr);}}
+
+.btn{
+  background:linear-gradient(180deg, #1c2740, #131b2e); border:1px solid var(--line); color:var(--text);
+  padding:11px 18px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; text-align:center;
+  transition:transform .1s ease, border-color .15s ease; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+}
+.btn:active{transform:scale(.96);}
+.btn.primary{background:linear-gradient(180deg, #14c17d, var(--table-dark)); border-color:var(--table); color:#03150c; font-weight:700;}
+.btn.accent{background:linear-gradient(180deg, #ff6b78, #d8323f); border-color:var(--paddle); color:#fff;}
+.btn.gold{background:linear-gradient(180deg, #ffd579, var(--gold)); border-color:var(--gold); color:#2b1e00;}
+.btn.blue{background:linear-gradient(180deg, #79c1ff, var(--blue)); border-color:var(--blue); color:#022038;}
+.btn.ghost{background:transparent;}
+.btn.block{width:100%;}
+.btn.small{padding:7px 12px; font-size:12.5px;}
+.btn:disabled{opacity:.4; cursor:not-allowed;}
+
+.progress{height:10px; border-radius:6px; background:var(--bg-elev-2); overflow:hidden; border:1px solid var(--line);}
+.progress > div{height:100%; background:linear-gradient(90deg, var(--table-dark), var(--table)); border-radius:6px; transition:width .4s ease;}
+.progress.gold > div{background:linear-gradient(90deg, var(--gold-dim), var(--gold));}
+.progress.blue > div{background:linear-gradient(90deg, #1f5c8a, var(--blue));}
+
+.row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+.muted{color:var(--text-dim); font-size:13px;}
+.tag{font-size:11px; padding:2px 8px; border-radius:6px; background:var(--bg-elev-2); border:1px solid var(--line); color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em;}
+.tag.vip{color:var(--gold); border-color:var(--gold-dim); background:rgba(245,184,65,.1);}
+.tag.new{color:var(--good); border-color:#1c5c3c;}
+.tag.locked{color:var(--danger); border-color:#5c2323;}
+
+/* ---------- Bottom nav ---------- */
+#bottomnav{
+  position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex; justify-content:space-around;
+  background:linear-gradient(0deg, rgba(8,11,20,.98), rgba(8,11,20,.9)); border-top:1px solid var(--line);
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom)); backdrop-filter:blur(8px);
+  overflow-x:auto;
+}
+.navbtn{
+  display:flex; flex-direction:column; align-items:center; gap:2px; color:var(--text-dim); background:none; border:none;
+  font-size:10px; padding:6px 8px; cursor:pointer; min-width:52px; font-family:'Inter';
+}
+.navbtn svg{width:20px; height:20px;}
+.navbtn.active{color:var(--table);}
+.navbtn.active svg{filter:drop-shadow(0 0 6px rgba(15,169,104,.7));}
+
+/* ---------- Auth ---------- */
+#screen-auth.active{display:flex; align-items:center; justify-content:center; min-height:100%; padding:20px;}
+.auth-box{width:100%; max-width:380px; background:var(--bg-elev); border:1px solid var(--line); border-radius:18px; padding:28px 24px; box-shadow:var(--shadow); text-align:center;}
+.auth-box .logo{font-family:'Teko'; font-size:44px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px;}
+.auth-box input{
+  width:100%; padding:12px 14px; margin:8px 0; border-radius:10px; border:1px solid var(--line);
+  background:var(--bg-elev-2); color:var(--text); font-size:14px; outline:none;
+}
+.auth-box input:focus{border-color:var(--table);}
+.auth-tabs{display:flex; gap:8px; margin:16px 0 10px; background:var(--bg-elev-2); padding:4px; border-radius:10px;}
+.auth-tabs button{flex:1; padding:8px; border:none; border-radius:8px; background:transparent; color:var(--text-dim); font-weight:600; cursor:pointer;}
+.auth-tabs button.active{background:var(--table-dark); color:#fff;}
+
+/* ---------- Home hero ---------- */
+.hero{
+  border-radius:18px; padding:22px; margin-bottom:16px; position:relative; overflow:hidden;
+  background:linear-gradient(135deg, #0e2a22, #0c1730 60%); border:1px solid var(--line);
+}
+.hero::after{content:'';position:absolute; right:-40px; top:-40px; width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle, rgba(15,169,104,.35), transparent 70%);}
+.hero h2{margin:0 0 4px; font-family:'Teko'; font-size:30px;}
+.avatar{
+  width:56px;height:56px;border-radius:50%; background:linear-gradient(135deg, var(--blue), var(--table));
+  display:flex;align-items:center;justify-content:center; font-family:'Teko'; font-size:26px; font-weight:700; color:#04121b; flex-shrink:0;
+  border:2px solid var(--bg-elev);
+}
+.avatar.vip{border-color:var(--gold); box-shadow:0 0 12px rgba(245,184,65,.5);}
+
+/* ---------- Stat mini grid ---------- */
+.statmini{background:var(--bg-elev-2); border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center;}
+.statmini .v{font-family:'Rajdhani'; font-weight:700; font-size:22px;}
+.statmini .l{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em;}
+
+/* ---------- Shop / inventory items ---------- */
+.item-card{background:var(--bg-elev-2); border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;}
+.item-swatch{height:64px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:28px;}
+.item-name{font-weight:600; font-size:13.5px;}
+.item-price{font-size:12.5px; display:flex; align-items:center; gap:4px;}
+.rarity-common{border-color:#3a4666 !important;}
+.rarity-rare{border-color:#2c6fb8 !important;}
+.rarity-epic{border-color:#8a4fd8 !important;}
+.rarity-legendary{border-color:var(--gold) !important; box-shadow:0 0 14px rgba(245,184,65,.15);}
+
+/* ---------- Game screen ---------- */
+#screen-game{padding:0; max-width:none;}
+#gameWrap{position:relative; width:100%; height:calc(100vh - 0px); display:flex; flex-direction:column; background:#000;}
+#gameHud{display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:rgba(8,11,20,.85); border-bottom:1px solid var(--line); z-index:5;}
+#gameHud .side{display:flex; align-items:center; gap:8px; min-width:90px;}
+#gameHud .score{font-family:'Rajdhani'; font-weight:700; font-size:30px;}
+#gameCanvasHolder{flex:1; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+canvas#pong{background:#04170f; border-radius:10px; touch-action:none; max-width:100%; max-height:100%;}
+#gameOverlayMsg{position:absolute; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:rgba(4,6,12,.78); z-index:6; text-align:center; padding:20px;}
+#gameOverlayMsg.show{display:flex;}
+#gameOverlayMsg h2{font-family:'Teko'; font-size:44px; margin:0;}
+@keyframes winPop{0%{transform:scale(.3) rotate(-8deg); opacity:0;} 60%{transform:scale(1.15) rotate(3deg); opacity:1;} 100%{transform:scale(1) rotate(0deg); opacity:1;}}
+@keyframes winGradientMove{0%{background-position:0% 50%;} 100%{background-position:300% 50%;}}
+@keyframes winGlow{0%,100%{filter:drop-shadow(0 0 14px rgba(245,184,65,.55)) drop-shadow(0 0 26px rgba(15,169,104,.35));} 50%{filter:drop-shadow(0 0 24px rgba(245,184,65,.85)) drop-shadow(0 0 42px rgba(15,169,104,.6));}}
+.win-banner{
+  display:inline-block; font-family:'Teko',sans-serif; font-weight:700; font-size:76px; letter-spacing:.06em;
+  background:linear-gradient(90deg,#f5b841,#0fa968,#4da8ff,#f5b841); background-size:300% 100%;
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation:winPop .5s cubic-bezier(.34,1.56,.64,1) both, winGradientMove 2.2s linear infinite, winGlow 1.4s ease-in-out infinite;
+}
+@keyframes confettiFall{0%{transform:translateY(-30px) rotate(0deg); opacity:1;} 100%{transform:translateY(260px) rotate(360deg); opacity:0;}}
+.confetti-piece{position:absolute; top:0; pointer-events:none; animation:confettiFall 1.8s ease-in forwards;}
+#pauseBtn{background:var(--bg-elev-2); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:6px 10px; cursor:pointer;}
+
+/* ---------- Toast ---------- */
+#toastWrap{position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:100; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;}
+.toast{background:var(--bg-elev); border:1px solid var(--table); box-shadow:var(--shadow); padding:10px 18px; border-radius:10px; font-size:13.5px; display:flex; align-items:center; gap:8px; animation:toastIn .25s ease;}
+.toast.gold{border-color:var(--gold);}
+@keyframes toastIn{from{opacity:0; transform:translateY(-10px)} to{opacity:1; transform:none}}
+
+/* ---------- Modal ---------- */
+.modal-bg{position:fixed; inset:0; background:rgba(4,6,12,.72); z-index:200; display:none; align-items:center; justify-content:center; padding:20px;}
+.modal-bg.show{display:flex;}
+.modal{background:var(--bg-elev); border:1px solid var(--line); border-radius:16px; padding:22px; max-width:400px; width:100%; box-shadow:var(--shadow); text-align:center;}
+.modal h3{font-family:'Teko'; font-size:26px; margin:0 0 10px;}
+.spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line); border-top-color:var(--table); animation:spin 1s linear infinite; margin:14px auto;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Levels map */
+.levelnode{
+  display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; background:var(--bg-elev-2); border:1px solid var(--line); margin-bottom:10px;
+}
+.levelnode .num{width:40px;height:40px;border-radius:50%; background:var(--bg-elev); border:2px solid var(--table); display:flex; align-items:center; justify-content:center; font-family:'Rajdhani'; font-weight:700; font-size:16px; flex-shrink:0;}
+.levelnode.locked .num{border-color:var(--line); color:var(--text-dim);}
+.levelnode .stars{color:var(--gold); font-size:14px; letter-spacing:2px;}
+
+/* Leaderboard row */
+.lbrow{display:flex; align-items:center; gap:10px; padding:10px; border-radius:10px; background:var(--bg-elev-2); margin-bottom:6px; border:1px solid var(--line);}
+.lbrow .rank{width:26px; text-align:center; font-family:'Rajdhani'; font-weight:700; color:var(--text-dim);}
+.lbrow.top1 .rank{color:var(--gold);}
+.lbrow.top2 .rank{color:#c8ccd6;}
+.lbrow.top3 .rank{color:#cf8a4c;}
+.lbrow.me{border-color:var(--table);}
+
+/* Achievement */
+.ach{display:flex; gap:12px; align-items:center; padding:12px; border-radius:12px; background:var(--bg-elev-2); border:1px solid var(--line); margin-bottom:10px;}
+.ach .icon{width:42px;height:42px;border-radius:10px; background:var(--bg-elev); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;}
+.ach.done .icon{background:linear-gradient(135deg, var(--table), var(--table-dark));}
+
+.switchrow{display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--line);}
+.switchrow:last-child{border-bottom:none;}
+.switch{width:42px;height:24px;border-radius:12px; background:var(--bg-elev-2); border:1px solid var(--line); position:relative; cursor:pointer;}
+.switch.on{background:var(--table-dark); border-color:var(--table);}
+.switch .knob{width:18px;height:18px;border-radius:50%; background:#fff; position:absolute; top:2px; left:2px; transition:left .15s ease;}
+.switch.on .knob{left:20px;}
+
+::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
+</style>
+</head>
+<body>
+<canvas id="liveBgCanvas" style="position:fixed; inset:0; z-index:-3; display:none; width:100%; height:100%;"></canvas>
+<video id="customBgVideo" autoplay loop muted playsinline style="position:fixed; inset:0; z-index:-3; display:none; width:100%; height:100%; object-fit:cover;"></video>
+<img id="customBgImage" style="position:fixed; inset:0; z-index:-3; display:none; width:100%; height:100%; object-fit:cover;">
+<div id="app">
+
+  <!-- ============ AUTH ============ -->
+  <div class="screen active" id="screen-auth">
+    <div class="auth-box">
+      <div class="logo"><span class="ball" style="display:inline-block;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,var(--table) 60%);box-shadow:0 0 10px var(--table)"></span> Ping Pong <span style="color:var(--gold)">VIP</span></div>
+      <p class="muted" style="margin-top:6px;">Sign in to sync your career across every device.</p>
+      <div class="auth-tabs">
+        <button class="active" id="tabLogin" onclick="Auth.showTab('login')">Log In</button>
+        <button id="tabRegister" onclick="Auth.showTab('register')">Create Account</button>
+      </div>
+      <div id="authLoginForm">
+        <input id="loginUser" placeholder="Username" autocomplete="username">
+        <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password">
+        <button class="btn primary block" style="margin-top:10px;" onclick="Auth.login()">Log In</button>
+      </div>
+      <div id="authRegisterForm" style="display:none;">
+        <input id="regUser" placeholder="Choose a username">
+        <input id="regPass" type="password" placeholder="Choose a password">
+        <button class="btn primary block" style="margin-top:10px;" onclick="Auth.register()">Create Account</button>
+      </div>
+      <p id="authError" style="color:var(--danger); font-size:12.5px; min-height:16px; margin:10px 0 0;"></p>
+      <p class="muted" style="font-size:11px; margin-top:14px;">Your password is hashed and never stored in plain text. Progress is saved to the server and cached on this device, so it syncs automatically wherever you log in.</p>
+    </div>
+  </div>
+
+  <!-- ============ MAIN SHELL (topbar + screens + bottomnav) ============ -->
+  <div id="mainShell" style="display:none; flex-direction:column; height:100%;">
+    <div id="topbar">
+      <div class="brand"><span class="ball"></span>Ping Pong<span class="vip">VIP</span></div>
+      <div id="topStats">
+        <div class="lvl-badge" id="lvlBadge" title="Account Level"><span id="lvlBadgeNum">1</span></div>
+        <div class="pill coins">🪙 <span id="topCoins">0</span></div>
+        <div class="pill gems">💎 <span id="topGems">0</span></div>
+      </div>
+    </div>
+
+    <div id="screens">
+
+      <!-- HOME -->
+      <div class="screen" id="screen-home">
+        <div class="hero">
+          <div class="row" style="align-items:center;">
+            <div class="row" style="gap:12px;">
+              <div class="avatar" id="homeAvatar" style="cursor:pointer;" onclick="Profile.changeAvatarPrompt()">P</div>
+              <div>
+                <h2 id="homeUsername">Player</h2>
+                <div class="muted" id="homeTagline">Level 1 · Rookie Paddler</div>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="muted" style="font-size:11px;">ACCOUNT LEVEL</div>
+              <div class="font-display" style="font-size:32px; line-height:1;" id="homeLevelNum">1</div>
+            </div>
+          </div>
+          <div style="margin-top:14px;">
+            <div class="row" style="font-size:11px; color:var(--text-dim); margin-bottom:4px;"><span>XP</span><span id="homeXpText">0 / 100</span></div>
+            <div class="progress"><div id="homeXpBar" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="grid cols-3" style="margin-bottom:16px;">
+          <div class="statmini"><div class="v" id="statWins">0</div><div class="l">Wins</div></div>
+          <div class="statmini"><div class="v" id="statLosses">0</div><div class="l">Losses</div></div>
+          <div class="statmini"><div class="v" id="statWinrate">0%</div><div class="l">Win Rate</div></div>
+        </div>
+
+        <div class="grid cols-2" style="margin-bottom:16px;">
+          <button class="btn primary block" style="padding:16px;" onclick="Nav.go('play')">▶ Quick Play</button>
+          <button class="btn accent block" style="padding:16px;" onclick="Nav.go('online')">🌐 Find Match</button>
+        </div>
+
+        <div class="card">
+          <div class="row"><h3 style="margin:0;">Daily Missions</h3><span class="tag" id="missionsResetTag">resets daily</span></div>
+          <div id="homeMissions" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="card">
+          <div class="row"><h3 style="margin:0;">Recent Matches</h3><a class="muted" style="cursor:pointer;" onclick="Nav.go('profile')">See all</a></div>
+          <div id="homeRecent" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <!-- PLAY HUB -->
+      <div class="screen" id="screen-play">
+        <h1 class="page-title"><span class="bar"></span>Play</h1>
+        <div class="grid cols-2">
+          <div class="card" style="text-align:center; cursor:pointer;" onclick="Nav.go('online')">
+            <div style="font-size:34px;">🌐</div>
+            <h3>Online Multiplayer</h3>
+            <p class="muted" style="font-size:12.5px;">Ranked 1v1 matchmaking against real opponents.</p>
+            <button class="btn accent block">Find Match</button>
+          </div>
+          <div class="card" style="text-align:center; cursor:pointer;" onclick="Nav.go('offline')">
+            <div style="font-size:34px;">🤖</div>
+            <h3>Offline / vs CPU</h3>
+            <p class="muted" style="font-size:12.5px;">Practice against AI with 4 difficulty levels.</p>
+            <button class="btn primary block">Play Offline</button>
+          </div>
+          <div class="card" style="text-align:center; cursor:pointer;" onclick="Nav.go('levels')">
+            <div style="font-size:34px;">🏆</div>
+            <h3>Career Levels</h3>
+            <p class="muted" style="font-size:12.5px;">Story-style challenges with stars & rewards.</p>
+            <button class="btn gold block">View Levels</button>
+          </div>
+          <div class="card" style="text-align:center; cursor:pointer;" onclick="Tournament.open()">
+            <div style="font-size:34px;">🎖️</div>
+            <h3>Tournament</h3>
+            <p class="muted" style="font-size:12.5px;">Win 3 rounds in a row for a big payout.</p>
+            <button class="btn blue block">Enter Tournament</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ONLINE -->
+      <div class="screen" id="screen-online">
+        <h1 class="page-title"><span class="bar"></span>Online Multiplayer</h1>
+        <div class="card" style="text-align:center;">
+          <div id="onlineIdle">
+            <div style="font-size:40px;">🌐</div>
+            <h3>Ranked Matchmaking</h3>
+            <p class="muted">Your rating: <b id="onlineRating">1000</b> · Region: Auto</p>
+            <button class="btn accent block" onclick="Online.findMatch()">Find Opponent</button>
+            <p class="muted" style="font-size:11px; margin-top:10px;">Matches sync live through your account's cloud connection. If no human opponent is found within a few seconds, you'll be matched with a skill-matched sparring bot so the queue never leaves you waiting.</p>
+          </div>
+          <div id="onlineSearching" style="display:none;">
+            <div class="spinner"></div>
+            <p>Searching for an opponent…</p>
+            <p class="muted" id="onlineSearchTimer">0s</p>
+            <button class="btn ghost block" onclick="Online.cancelSearch()">Cancel</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Live Global Leaderboard Preview</h3>
+          <div id="onlineLbPreview"></div>
+          <button class="btn ghost block small" onclick="Nav.go('leaderboard')" style="margin-top:6px;">Full Leaderboard →</button>
+        </div>
+      </div>
+
+      <!-- OFFLINE -->
+      <div class="screen" id="screen-offline">
+        <h1 class="page-title"><span class="bar"></span>Offline Practice</h1>
+        <div class="card">
+          <h3>Choose Difficulty</h3>
+          <div class="grid cols-2" id="difficultyGrid"></div>
+        </div>
+        <div class="card">
+          <h3>Match Length</h3>
+          <div class="grid cols-3" id="matchLenGrid"></div>
+        </div>
+        <button class="btn primary block" style="padding:16px;" onclick="Game.startOffline()">▶ Start Match</button>
+      </div>
+
+      <!-- LEVELS -->
+      <div class="screen" id="screen-levels">
+        <h1 class="page-title"><span class="bar"></span>Career Levels</h1>
+        <p class="muted" style="margin-top:-8px;">Clear objectives to earn stars, XP and coins. Each level raises the challenge.</p>
+        <div id="levelsList"></div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="screen" id="screen-profile">
+        <h1 class="page-title"><span class="bar"></span>Profile</h1>
+        <div class="card row" style="align-items:center;">
+          <div class="row" style="gap:14px;">
+            <div class="avatar" id="profAvatar" style="width:64px;height:64px;font-size:30px; cursor:pointer;" onclick="Profile.changeAvatarPrompt()">P</div>
+            <div>
+              <div class="row" style="gap:8px;">
+                <span style="font-family:'Teko'; font-size:24px;" id="profUsername">Player</span>
+                <button class="btn ghost small" style="padding:3px 9px; font-size:11px;" onclick="Profile.changeUsernamePrompt()">Edit</button>
+              </div>
+              <div class="muted" id="profJoined">Joined today</div>
+            </div>
+          </div>
+          <button class="btn ghost small" onclick="Auth.logout()">Log Out</button>
+        </div>
+        <div class="grid cols-3">
+          <div class="statmini"><div class="v" id="pStatMatches">0</div><div class="l">Matches</div></div>
+          <div class="statmini"><div class="v" id="pStatWins">0</div><div class="l">Wins</div></div>
+          <div class="statmini"><div class="v" id="pStatStreak">0</div><div class="l">Best Streak</div></div>
+        </div>
+        <div class="card">
+          <h3>Connected Accounts</h3>
+          <p class="muted" style="font-size:12.5px; margin-top:-4px;">Link a social account for faster sign-in on new devices.</p>
+          <div id="connectedAccountsList" style="margin-top:8px;"></div>
+        </div>
+        <div class="card">
+          <h3>Match History</h3>
+          <div id="profHistory"></div>
+        </div>
+      </div>
+
+      <!-- SHOP -->
+      <div class="screen" id="screen-shop">
+        <h1 class="page-title"><span class="bar"></span>Shop</h1>
+        <div class="card row">
+          <div>
+            <div class="muted" style="font-size:11px;">YOUR BALANCE</div>
+            <div style="font-family:'Rajdhani'; font-weight:700; font-size:18px;">🪙 <span id="shopCoins">0</span> &nbsp; 💎 <span id="shopGems">0</span></div>
+          </div>
+          <button class="btn gold small" onclick="Nav.go('vip')">Get Gems</button>
+        </div>
+        <div class="row" style="gap:8px; overflow-x:auto; padding-bottom:6px;" id="shopTabs"></div>
+        <div class="grid cols-3" id="shopGrid"></div>
+      </div>
+
+      <!-- VIP -->
+      <div class="screen" id="screen-vip">
+        <h1 class="page-title"><span class="bar"></span>VIP</h1>
+        <div class="card" style="background:linear-gradient(135deg, #2b210a, #161f36); border-color:var(--gold-dim);">
+          <div class="row">
+            <div>
+              <h3 style="color:var(--gold);">VIP Membership</h3>
+              <p class="muted" id="vipStatusText">Not active</p>
+            </div>
+            <div style="font-size:34px;">👑</div>
+          </div>
+          <ul class="muted" style="font-size:12.5px; line-height:1.7; padding-left:18px;">
+            <li>+50% XP from every match (faster leveling — cosmetic progression only)</li>
+            <li>Daily bonus of 25 💎 gems</li>
+            <li>Exclusive gold profile ring & VIP-only paddles, arenas & effects</li>
+            <li>Access to VIP-only shop items — all purely cosmetic, no stat boosts</li>
+          </ul>
+          <button class="btn gold block" id="vipBuyBtn" onclick="Shop.buyVipMembership()">Activate VIP — 💎 300 / month</button>
+        </div>
+        <div class="card" style="background:linear-gradient(135deg, #241236, #161f36); border-color:#7a5cff;">
+          <div class="row">
+            <div>
+              <h3 style="color:#b89bff;">Ultra VIP — Custom Backgrounds</h3>
+              <p class="muted" id="ultraVipStatusText">Not unlocked</p>
+            </div>
+            <div style="font-size:34px;">🎬</div>
+          </div>
+          <ul class="muted" style="font-size:12.5px; line-height:1.7; padding-left:18px;">
+            <li>Upload your own photo or short video as your app background</li>
+            <li>One-time unlock — costs more than base VIP since it's a bigger perk</li>
+            <li>Still cosmetic only — no effect on matches or rankings</li>
+          </ul>
+          <button class="btn block" style="background:linear-gradient(180deg,#b89bff,#7a5cff); border-color:#7a5cff; color:#1a0f33;" id="ultraVipBuyBtn" onclick="Shop.buyUltraVip()">Unlock Ultra VIP — 💎 500 (one-time)</button>
+          <div id="ultraVipUploadSection" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+            <p class="muted" style="font-size:12px;">Upload an image or a short video (max 7MB) to use as your background.</p>
+            <button class="btn blue block" onclick="document.getElementById('bgFileInput').click()">📁 Choose photo or video</button>
+            <button class="btn ghost block" style="margin-top:8px;" id="ultraVipRemoveBtn" onclick="Shop.removeCustomBackground()">Remove custom background</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Buy Gems</h3>
+          <p class="muted" style="font-size:12px;">Simulated store — this demo uses in-game currency only; a production build would connect this flow to a real payment processor (e.g. App Store / Play Billing / Stripe) via a secure backend.</p>
+          <div class="grid cols-3" id="gemPacks"></div>
+        </div>
+        <div class="card">
+          <h3>VIP-Exclusive Items</h3>
+          <div class="grid cols-3" id="vipItemsGrid"></div>
+        </div>
+      </div>
+
+      <!-- INVENTORY -->
+      <div class="screen" id="screen-inventory">
+        <h1 class="page-title"><span class="bar"></span>Inventory</h1>
+        <div class="row" style="gap:8px; overflow-x:auto; padding-bottom:6px;" id="invTabs"></div>
+        <div class="grid cols-3" id="invGrid"></div>
+      </div>
+
+      <!-- LEADERBOARD -->
+      <div class="screen" id="screen-leaderboard">
+        <h1 class="page-title"><span class="bar"></span>Leaderboard</h1>
+        <p class="muted" style="margin-top:-8px;">Global ranking shared with every Ping Pong VIP player.</p>
+        <div id="lbList"></div>
+      </div>
+
+      <!-- ACHIEVEMENTS -->
+      <div class="screen" id="screen-achievements">
+        <h1 class="page-title"><span class="bar"></span>Achievements</h1>
+        <div id="achList"></div>
+      </div>
+
+      <!-- ADMIN (only visible to accounts with isAdmin = true) -->
+      <div class="screen" id="screen-admin">
+        <h1 class="page-title"><span class="bar"></span>Admin Panel</h1>
+        <div class="card">
+          <h3>Grant Currency</h3>
+          <input id="adminGrantUser" placeholder="Username" style="width:100%; padding:10px; margin:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+          <div class="grid cols-2">
+            <input id="adminGrantCoins" type="number" placeholder="Coins" style="padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+            <input id="adminGrantGems" type="number" placeholder="Gems" style="padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+          </div>
+          <button class="btn gold block" style="margin-top:8px;" onclick="AdminPanel.grant()">Grant</button>
+        </div>
+        <div class="card">
+          <h3>Ban / Unban</h3>
+          <input id="adminBanUser" placeholder="Username" style="width:100%; padding:10px; margin:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+          <div class="grid cols-2">
+            <button class="btn accent" onclick="AdminPanel.ban(true)">Ban</button>
+            <button class="btn ghost" onclick="AdminPanel.ban(false)">Unban</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Inspect a Player</h3>
+          <p class="muted" style="font-size:12px;">Look up any account's stats, inventory, and equipped items.</p>
+          <input id="adminInspectUser" placeholder="Username" style="width:100%; padding:10px; margin:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+          <button class="btn blue block" onclick="AdminPanel.inspect()">View Profile</button>
+          <div id="adminInspectResult" style="margin-top:12px;"></div>
+        </div>
+        <div class="card">
+          <div class="row"><h3 style="margin:0;">All Accounts</h3><button class="btn ghost small" onclick="AdminPanel.load()">Refresh</button></div>
+          <div id="adminUserList" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="screen" id="screen-settings">
+        <h1 class="page-title"><span class="bar"></span>Settings</h1>
+        <div class="card">
+          <div class="switchrow"><span>Sound Effects</span><div class="switch on" id="swSfx" onclick="Settings.toggle('sfx')"><div class="knob"></div></div></div>
+          <div class="switchrow"><span>Music</span><div class="switch on" id="swMusic" onclick="Settings.toggle('music')"><div class="knob"></div></div></div>
+          <div class="switchrow"><span>Screen Shake</span><div class="switch on" id="swShake" onclick="Settings.toggle('shake')"><div class="knob"></div></div></div>
+          <div class="switchrow"><span>Invert Controls</span><div class="switch" id="swInvert" onclick="Settings.toggle('invert')"><div class="knob"></div></div></div>
+        </div>
+        <div class="card">
+          <h3>Account & Data</h3>
+          <p class="muted" style="font-size:12.5px;">Your progress is encrypted at rest and synced to the cloud automatically whenever you play — log in from any device to pick up exactly where you left off.</p>
+          <button class="btn ghost block" style="margin-top:10px;" onclick="Settings.changePasswordPrompt()">Change Password</button>
+          <button class="btn ghost block" onclick="Auth.logout()">Log Out</button>
+        </div>
+        <div class="card">
+          <h3>About</h3>
+          <p class="muted" style="font-size:12px;">Ping Pong VIP — demo build. Anti-cheat: server-side score & physics validation on every online rally; client input is never trusted for final scoring.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div id="bottomnav"></div>
+  </div>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <div class="screen" id="screen-game" style="z-index:50;">
+    <div id="gameWrap">
+      <div id="gameHud">
+        <div class="side">
+          <div class="avatar" style="width:34px;height:34px;font-size:15px;" id="hudP1Avatar">P</div>
+          <div><div style="font-size:11px;" class="muted" id="hudP1Name">You</div><div class="score" id="hudP1Score">0</div></div>
+        </div>
+        <div style="text-align:center;">
+          <div class="muted" style="font-size:11px;" id="hudModeLabel">OFFLINE</div>
+          <button id="pauseBtn" onclick="Game.togglePause()">⏸ Pause</button>
+        </div>
+        <div class="side" style="justify-content:flex-end; text-align:right;">
+          <div><div style="font-size:11px;" class="muted" id="hudP2Name">CPU</div><div class="score" id="hudP2Score">0</div></div>
+          <div class="avatar" style="width:34px;height:34px;font-size:15px; background:linear-gradient(135deg,var(--paddle),#8a1f28);" id="hudP2Avatar">C</div>
+        </div>
+      </div>
+      <div id="gameCanvasHolder">
+        <canvas id="pong" width="900" height="560"></canvas>
+        <div id="gameOverlayMsg">
+          <h2 id="overlayTitle">Get Ready</h2>
+          <p class="muted" id="overlaySub"></p>
+          <div id="overlayButtons"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toastWrap"></div>
+<input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="Profile.handleAvatarFile(event)">
+<input type="file" id="bgFileInput" accept="image/*,video/*" style="display:none;" onchange="Shop.handleBackgroundFile(event)">
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script>
+/* =========================================================================
+   PING PONG VIP — single-file client
+   Persistence: real backend (server.js) over HTTP + WebSockets, with a
+   localStorage cache on this device for instant loads / brief offline use.
+   ======================================================================= */
+
+/* ---------------- API + on-device storage helpers ----------------
+   Real backend calls (server.js) for accounts, saves & leaderboard.
+   localStorage caches the last-known state on THIS device so the game
+   still loads instantly / works briefly offline; the server is always
+   the source of truth for cross-device sync. */
+const API_BASE = ''; // same-origin: server serves this file too
+const LocalCache = {
+  key(u){ return 'pingpongvip:cache:'+u.toLowerCase(); },
+  save(username, state){ try{ localStorage.setItem(this.key(username), JSON.stringify(state)); }catch(e){} },
+  load(username){ try{ const v = localStorage.getItem(this.key(username)); return v?JSON.parse(v):null; }catch(e){ return null; } },
+  saveToken(t){ try{ localStorage.setItem('pingpongvip:token', t); }catch(e){} },
+  loadToken(){ try{ return localStorage.getItem('pingpongvip:token'); }catch(e){ return null; } },
+  clearToken(){ try{ localStorage.removeItem('pingpongvip:token'); }catch(e){} }
+};
+async function apiCall(path, method='GET', body=null, auth=true){
+  const headers = {'Content-Type':'application/json'};
+  const token = LocalCache.loadToken();
+  if(auth && token) headers['Authorization'] = 'Bearer '+token;
+  const res = await fetch(API_BASE+path, {method, headers, body: body?JSON.stringify(body):undefined});
+  let data = {};
+  try{ data = await res.json(); }catch(e){}
+  if(!res.ok) throw new Error(data.error || 'Request failed ('+res.status+')');
+  return data;
+}
+
+/* ---------------- Global state ---------------- */
+let STATE = null; // current player object
+let CURRENT_USER = null;
+
+/* Shop category (plural, e.g. 'paddles') -> the singular key used in
+   STATE.equipped (e.g. 'paddle'). Central mapping so buy/equip/read always agree. */
+const EQUIP_KEY_MAP = {paddles:'paddle', balls:'ball', arenas:'arena', outfits:'outfit', effects:'effect', animations:'animation', avatars:'avatar', backgrounds:'background'};
+
+function toast(msg, gold=false){
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast' + (gold ? ' gold':'');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.style.transition='opacity .3s'; el.style.opacity='0'; setTimeout(()=>el.remove(), 300); }, 2600);
+}
+function modal(html){ document.getElementById('modalContent').innerHTML = html; document.getElementById('modalBg').classList.add('show'); }
+function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
+
+/* ---------------- Sound (WebAudio synth, no external assets) ---------------- */
+const Sound = {
+  ctx:null,
+  ensure(){ if(!this.ctx){ try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } },
+  beep(freq=440, dur=.08, type='sine', vol=.15){
+    if(!STATE || !STATE.settings.sfx) return;
+    this.ensure(); if(!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type=type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t+dur);
+    o.connect(g); g.connect(this.ctx.destination); o.start(t); o.stop(t+dur);
+  },
+  hit(){ this.beep(320+Math.random()*80, .06, 'square', .12); },
+  wall(){ this.beep(180, .05, 'triangle', .1); },
+  score(){ this.beep(200,.12,'sawtooth',.12); setTimeout(()=>this.beep(300,.15,'sawtooth',.12), 90); },
+  win(){ [440,554,659,880].forEach((f,i)=>setTimeout(()=>this.beep(f,.18,'sine',.13), i*110)); },
+  lose(){ [440,392,330,261].forEach((f,i)=>setTimeout(()=>this.beep(f,.2,'sine',.12), i*120)); },
+  click(){ this.beep(600,.03,'sine',.08); },
+  coin(){ this.beep(880,.05,'square',.1); setTimeout(()=>this.beep(1180,.08,'square',.1), 60); }
+};
+
+/* ---------------- Content definitions ---------------- */
+const RARITY_COLOR = {common:'#3a4666', rare:'#2c6fb8', epic:'#8a4fd8', legendary:'#f5b841'};
+
+const SHOP_CATALOG = {
+  paddles: [
+    {id:'paddle_classic', name:'Classic Red', icon:'🏓', price:0, cur:'coins', rarity:'common', color:'#ff4757'},
+    {id:'paddle_blue', name:'Azure Strike', icon:'🏓', price:200, cur:'coins', rarity:'common', color:'#4da8ff'},
+    {id:'paddle_carbon', name:'Carbon Fiber', icon:'🏓', price:650, cur:'coins', rarity:'rare', color:'#333'},
+    {id:'paddle_neon', name:'Neon Volt', icon:'🏓', price:1200, cur:'coins', rarity:'epic', color:'#b6ff3c'},
+    {id:'paddle_dragon', name:'Dragon Scale', icon:'🏓', price:60, cur:'gems', rarity:'epic', color:'#e0552b'},
+    {id:'paddle_gold', name:'Golden Ace', icon:'🏓', price:150, cur:'gems', rarity:'legendary', color:'#f5b841', vip:true},
+    {id:'paddle_aurora', name:'Aurora Wave', icon:'🏓', price:220, cur:'gems', rarity:'legendary', color:'#7de6ff', vip:true},
+  ],
+  balls: [
+    {id:'ball_classic', name:'Standard Ball', icon:'⚪', price:0, cur:'coins', rarity:'common', color:'#fff'},
+    {id:'ball_glow', name:'Glow Orb', icon:'🟡', price:300, cur:'coins', rarity:'rare', color:'#ffd579'},
+    {id:'ball_fire', name:'Fireball Trail', icon:'🔴', price:900, cur:'coins', rarity:'epic', color:'#ff5c3c'},
+    {id:'ball_galaxy', name:'Galaxy Sphere', icon:'🟣', price:80, cur:'gems', rarity:'epic', color:'#a55cff'},
+    {id:'ball_diamond', name:'Diamond Core', icon:'💎', price:180, cur:'gems', rarity:'legendary', color:'#7de6ff', vip:true},
+  ],
+  arenas: [
+    {id:'arena_classic', name:'Club Table', icon:'🟩', price:0, cur:'coins', rarity:'common', color:'#0fa968'},
+    {id:'arena_night', name:'Night League', icon:'🌃', price:500, cur:'coins', rarity:'rare', color:'#1a2a52'},
+    {id:'arena_beach', name:'Beach Court', icon:'🏖️', price:750, cur:'coins', rarity:'rare', color:'#2aa5c9'},
+    {id:'arena_neonarena', name:'Neon Arena', icon:'🌆', price:100, cur:'gems', rarity:'epic', color:'#d81fae'},
+    {id:'arena_royal', name:'Royal Hall', icon:'🏛️', price:250, cur:'gems', rarity:'legendary', color:'#b48a2c', vip:true},
+    {id:'arena_space', name:'Orbital Station', icon:'🛰️', price:300, cur:'gems', rarity:'legendary', color:'#2b2f52', vip:true},
+  ],
+  outfits: [
+    {id:'outfit_classic', name:'Team Jersey', icon:'👕', price:0, cur:'coins', rarity:'common', color:'#4da8ff'},
+    {id:'outfit_pro', name:'Pro Kit', icon:'🎽', price:400, cur:'coins', rarity:'rare', color:'#ff4757'},
+    {id:'outfit_champion', name:"Champion's Robe", icon:'🥋', price:120, cur:'gems', rarity:'legendary', color:'#f5b841', vip:true},
+  ],
+  effects: [
+    {id:'effect_none', name:'No Trail', icon:'✨', price:0, cur:'coins', rarity:'common', color:'#666'},
+    {id:'effect_sparkle', name:'Sparkle Trail', icon:'✨', price:350, cur:'coins', rarity:'rare', color:'#ffe27a'},
+    {id:'effect_lightning', name:'Lightning Trail', icon:'⚡', price:90, cur:'gems', rarity:'epic', color:'#ffe64d'},
+    {id:'effect_rainbow', name:'Rainbow Trail', icon:'🌈', price:200, cur:'gems', rarity:'legendary', color:'#ff5cf0', vip:true},
+  ],
+  animations: [
+    {id:'anim_none', name:'Standard Serve', icon:'🙆', price:0, cur:'coins', rarity:'common', color:'#666'},
+    {id:'anim_spin', name:'Spin Serve', icon:'🌀', price:300, cur:'coins', rarity:'rare', color:'#4da8ff'},
+    {id:'anim_smash', name:'Smash Celebration', icon:'💥', price:70, cur:'gems', rarity:'epic', color:'#ff4757'},
+    {id:'anim_royal', name:'Royal Bow', icon:'🙇', price:180, cur:'gems', rarity:'legendary', color:'#f5b841', vip:true},
+  ],
+  avatars: [
+    {id:'avatar_default', name:'Initial', icon:null, price:0, cur:'coins', rarity:'common', color:'#4da8ff'},
+    {id:'avatar_paddle', name:'Paddler', icon:'🏓', price:80, cur:'coins', rarity:'common', color:'#ff4757'},
+    {id:'avatar_fire', name:'On Fire', icon:'🔥', price:150, cur:'coins', rarity:'rare', color:'#ff7a3c'},
+    {id:'avatar_bolt', name:'Lightning', icon:'⚡', price:150, cur:'coins', rarity:'rare', color:'#ffe64d'},
+    {id:'avatar_star', name:'Star Player', icon:'⭐', price:300, cur:'coins', rarity:'epic', color:'#ffd579'},
+    {id:'avatar_shark', name:'Table Shark', icon:'🦈', price:350, cur:'coins', rarity:'epic', color:'#5cc9e6'},
+    {id:'avatar_dino', name:'Rex', icon:'🦖', price:250, cur:'coins', rarity:'rare', color:'#7ec97e'},
+    {id:'avatar_panda', name:'Panda', icon:'🐼', price:200, cur:'coins', rarity:'rare', color:'#e8e8e8'},
+    {id:'avatar_ninja', name:'Ninja', icon:'🥷', price:400, cur:'coins', rarity:'epic', color:'#3a3a4a'},
+    {id:'avatar_astronaut', name:'Astronaut', icon:'🧑‍🚀', price:450, cur:'coins', rarity:'epic', color:'#c9d6e6'},
+    {id:'avatar_dragon', name:'Dragon', icon:'🐉', price:60, cur:'gems', rarity:'epic', color:'#e0552b'},
+    {id:'avatar_alien', name:'Alien', icon:'👽', price:70, cur:'gems', rarity:'epic', color:'#7de67d'},
+    {id:'avatar_robot', name:'Robot', icon:'🤖', price:70, cur:'gems', rarity:'epic', color:'#9aa5b1'},
+    {id:'avatar_unicorn', name:'Unicorn', icon:'🦄', price:90, cur:'gems', rarity:'epic', color:'#f0a8ff'},
+    {id:'avatar_crown', name:'Champion', icon:'👑', price:150, cur:'gems', rarity:'legendary', color:'#f5b841', vip:true},
+    {id:'avatar_ghost', name:'Phantom', icon:'👻', price:150, cur:'gems', rarity:'legendary', color:'#c9c9ff', vip:true},
+    {id:'avatar_wizard', name:'Grand Wizard', icon:'🧙', price:170, cur:'gems', rarity:'legendary', color:'#7a5cff', vip:true},
+    {id:'avatar_phoenix', name:'Phoenix', icon:'🔥', price:200, cur:'gems', rarity:'legendary', color:'#ff8a3c', vip:true},
+  ],
+  backgrounds: [
+    {id:'bg_default', name:'Default Navy', icon:'🌌', price:0, cur:'coins', rarity:'common', color:'#0b0f1a'},
+    {id:'bg_forest', name:'Deep Forest', icon:'🌲', price:200, cur:'coins', rarity:'common', color:'#0e2a1c'},
+    {id:'bg_sunset', name:'Sunset Glow', icon:'🌇', price:350, cur:'coins', rarity:'rare', color:'#4a1e2b'},
+    {id:'bg_ocean', name:'Ocean Deep', icon:'🌊', price:350, cur:'coins', rarity:'rare', color:'#0d2a3a'},
+    {id:'bg_charcoal', name:'Charcoal', icon:'⬛', price:150, cur:'coins', rarity:'common', color:'#1a1a1a'},
+    {id:'bg_plum', name:'Plum Night', icon:'🍇', price:300, cur:'coins', rarity:'rare', color:'#2a1633'},
+    {id:'bg_teal', name:'Deep Teal', icon:'🌀', price:300, cur:'coins', rarity:'rare', color:'#0d3330'},
+    {id:'bg_aurora', name:'Aurora Sky', icon:'🌠', price:80, cur:'gems', rarity:'epic', color:'#123a3a'},
+    {id:'bg_volcano', name:'Volcano', icon:'🌋', price:90, cur:'gems', rarity:'epic', color:'#2a1210'},
+    {id:'bg_cosmic', name:'Cosmic Purple', icon:'🪐', price:100, cur:'gems', rarity:'epic', color:'#26123f'},
+    {id:'bg_midnight', name:'Midnight Gold', icon:'✨', price:150, cur:'gems', rarity:'legendary', color:'#2b220a', vip:true},
+    {id:'bg_royal', name:'Royal Purple', icon:'👑', price:150, cur:'gems', rarity:'legendary', color:'#241236', vip:true},
+    {id:'bg_electric', name:'Electric Blue', icon:'⚡', price:170, cur:'gems', rarity:'legendary', color:'#0a1f4a', vip:true},
+    {id:'bg_space_live', name:'Deep Space (Live)', icon:'🌌', price:220, cur:'gems', rarity:'legendary', color:'#05070f', vip:true, live:'space'},
+    {id:'bg_matrix_live', name:'Cyber Grid (Live)', icon:'💻', price:220, cur:'gems', rarity:'legendary', color:'#020805', vip:true, live:'matrix'},
+  ]
+};
+const GEM_PACKS = [
+  {id:'g100',   gems:60,    price:'Rs. 100'},
+  {id:'g200',   gems:124,   price:'Rs. 200',   bonus:'+3%'},
+  {id:'g300',   gems:190,   price:'Rs. 300',   bonus:'+6%'},
+  {id:'g400',   gems:260,   price:'Rs. 400',   bonus:'+8%'},
+  {id:'g500',   gems:330,   price:'Rs. 500',   bonus:'+10%'},
+  {id:'g1000',  gems:690,   price:'Rs. 1,000',  bonus:'+15%'},
+  {id:'g1500',  gems:1060,  price:'Rs. 1,500',  bonus:'+18%'},
+  {id:'g3000',  gems:2160,  price:'Rs. 3,000',  bonus:'+20%'},
+  {id:'g5000',  gems:3750,  price:'Rs. 5,000',  bonus:'+25%'},
+  {id:'g10000', gems:7500,  price:'Rs. 10,000', bonus:'+25%'},
+  {id:'g20000', gems:15000, price:'Rs. 20,000', bonus:'+25%'},
+  {id:'g50000', gems:37500, price:'Rs. 50,000', bonus:'+25%'}
+];
+const ACHIEVEMENTS = [
+  {id:'first_win', name:'First Victory', desc:'Win your first match', icon:'🏆', target:1, stat:'wins'},
+  {id:'wins_10', name:'Rising Star', desc:'Win 10 matches', icon:'⭐', target:10, stat:'wins'},
+  {id:'wins_50', name:'Table Veteran', desc:'Win 50 matches', icon:'🎖️', target:50, stat:'wins'},
+  {id:'streak_5', name:'On Fire', desc:'Win a 5-match streak', icon:'🔥', target:5, stat:'bestStreak'},
+  {id:'level_10', name:'Dedicated Player', desc:'Reach account level 10', icon:'📈', target:10, stat:'level'},
+  {id:'level_25', name:'Ping Pong Master', desc:'Reach account level 25', icon:'👑', target:25, stat:'level'},
+  {id:'perfect', name:'Flawless', desc:'Win a match without conceding a point', icon:'💎', target:1, stat:'perfectGames'},
+  {id:'shopper', name:'Collector', desc:'Own 5 shop items', icon:'🎒', target:5, stat:'itemsOwned'},
+  {id:'vip_member', name:'VIP Status', desc:'Activate VIP membership', icon:'👑', target:1, stat:'vipActivations'},
+  {id:'levels_5', name:'Career Climber', desc:'Clear 5 career levels', icon:'🗺️', target:5, stat:'levelsCleared'},
+  {id:'tourney_champ', name:'Tournament Champion', desc:'Win a full tournament', icon:'🏅', target:1, stat:'tournamentsWon'},
+  {id:'matches_100', name:'Century Club', desc:'Play 100 matches', icon:'💯', target:100, stat:'matchesPlayed'},
+];
+const MISSION_POOL = [
+  {id:'win1', desc:'Win 1 match', target:1, stat:'sessionWins', reward:{coins:80,xp:40}},
+  {id:'play3', desc:'Play 3 matches', target:3, stat:'sessionMatches', reward:{coins:60,xp:30}},
+  {id:'score15', desc:'Score 15 points total', target:15, stat:'sessionPoints', reward:{coins:70,xp:35}},
+  {id:'winstreak2', desc:'Win 2 in a row', target:2, stat:'sessionStreak', reward:{coins:100,xp:50}},
+  {id:'smash5', desc:'Land 5 fast smashes', target:5, stat:'sessionSmashes', reward:{coins:90,xp:45}},
+];
+const CAMPAIGN_LEVELS = (()=>{
+  const arr=[]; const goals=[
+    ['Win to 7 points','win'],['Beat the CPU by 3+ points','marginwin'],['Win without losing more than 4 points','clean'],
+    ['Land 3 smashes in one match','smash'],['Win a 11-point match','win11'],['Survive a speed-ramp rally','speed'],
+    ['Win two rallies in a row over 10 hits','longrally'],['Beat Hard CPU','hard'],['Win by exactly 2 points (deuce)','deuce'],['Beat Insane CPU','insane']
+  ];
+  for(let i=0;i<goals.length;i++){
+    arr.push({id:i+1, name:'Level '+(i+1), objective:goals[i][0], type:goals[i][1],
+      difficulty: i<3?'easy': i<6?'medium': i<9?'hard':'insane',
+      reward:{coins:100+i*40, xp:60+i*25, gems: (i+1)%3===0? 15:0}});
+  }
+  return arr;
+})();
+
+/* ---------------- Avatar & background rendering helpers ---------------- */
+function getAvatarIcon(){
+  if(!STATE) return null;
+  const a = SHOP_CATALOG.avatars.find(x=>x.id===STATE.equipped.avatar);
+  return a && a.icon ? a.icon : null;
+}
+function spawnConfetti(container){
+  if(!container) return;
+  container.querySelectorAll('.confetti-piece').forEach(el=>el.remove());
+  const emojis = ['🎉','⭐','🏆','✨','🥳','💥','🎊'];
+  for(let i=0;i<20;i++){
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    el.style.left = (Math.random()*90+5)+'%';
+    el.style.animationDelay = (Math.random()*0.5)+'s';
+    el.style.fontSize = (14+Math.random()*16)+'px';
+    container.appendChild(el);
+    setTimeout(()=>el.remove(), 2400);
+  }
+}
+function setAvatarEl(el, fallbackLetter){
+  if(!el) return;
+  if(STATE && STATE.customAvatarUrl){
+    el.innerHTML = `<img src="${STATE.customAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    return;
+  }
+  const icon = getAvatarIcon();
+  el.innerHTML = '';
+  el.textContent = icon || fallbackLetter;
+}
+/* ---------------- Live animated backgrounds (canvas) ---------------- */
+const LiveBackground = {
+  raf:null, kind:null, stars:[], drops:[],
+  stop(){
+    cancelAnimationFrame(this.raf); this.raf=null; this.kind=null;
+    document.getElementById('liveBgCanvas').style.display='none';
+  },
+  start(kind){
+    this.kind = kind;
+    const canvas = document.getElementById('liveBgCanvas');
+    canvas.style.display='block';
+    const ctx = canvas.getContext('2d');
+    const resize = ()=>{ canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    resize();
+    if(!this._resizeBound){ window.addEventListener('resize', ()=>{ if(this.kind) resize(); }); this._resizeBound=true; }
+    if(kind==='space'){
+      this.stars = Array.from({length:140}, ()=>({
+        x:Math.random()*canvas.width, y:Math.random()*canvas.height,
+        r:Math.random()*1.6+0.3, s:Math.random()*0.4+0.05, tw:Math.random()*Math.PI*2
+      }));
+    } else if(kind==='matrix'){
+      const cols = Math.floor(canvas.width/16);
+      this.drops = Array.from({length:cols}, ()=>Math.random()*-50);
+    }
+    const loop = ()=>{
+      if(this.kind==='space'){
+        ctx.fillStyle='#05070f'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        this.stars.forEach(st=>{
+          st.tw += 0.03;
+          const alpha = 0.4 + Math.sin(st.tw)*0.4;
+          ctx.beginPath(); ctx.fillStyle = `rgba(200,220,255,${Math.max(0,alpha)})`;
+          ctx.arc(st.x, st.y, st.r, 0, Math.PI*2); ctx.fill();
+          st.y += st.s; if(st.y>canvas.height){ st.y=0; st.x=Math.random()*canvas.width; }
+        });
+      } else if(this.kind==='matrix'){
+        ctx.fillStyle='rgba(2,8,5,0.18)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle='#3ddc84'; ctx.font='14px monospace';
+        this.drops.forEach((y,i)=>{
+          const ch = String.fromCharCode(0x30A0 + Math.random()*96);
+          ctx.fillText(ch, i*16, y*16);
+          this.drops[i] = (y*16>canvas.height && Math.random()>0.975) ? 0 : y+1;
+        });
+      }
+      this.raf = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+};
+
+/* ---------------- Live animated backgrounds (canvas) ---------------- */
+function applyBackground(){
+  if(!STATE) return;
+  const videoEl = document.getElementById('customBgVideo');
+  const imgEl = document.getElementById('customBgImage');
+  // Priority 1: an uploaded custom photo/video (Ultra VIP)
+  if(STATE.customBackgroundUrl){
+    LiveBackground.stop();
+    if(STATE.customBackgroundType==='video'){
+      imgEl.style.display='none';
+      if(videoEl.src.indexOf(STATE.customBackgroundUrl)===-1) videoEl.src = STATE.customBackgroundUrl;
+      videoEl.style.display='block';
+    } else {
+      videoEl.style.display='none'; videoEl.removeAttribute('src');
+      imgEl.src = STATE.customBackgroundUrl;
+      imgEl.style.display='block';
+    }
+    document.body.style.background = 'transparent';
+    return;
+  }
+  videoEl.style.display='none'; videoEl.removeAttribute('src'); imgEl.style.display='none';
+  // Priority 2: a purchased "live" animated theme
+  const bg = SHOP_CATALOG.backgrounds.find(b=>b.id===STATE.equipped.background) || SHOP_CATALOG.backgrounds[0];
+  if(bg.live){
+    document.body.style.background = bg.color;
+    LiveBackground.start(bg.live);
+    return;
+  }
+  // Priority 3: a plain static gradient color
+  LiveBackground.stop();
+  document.body.style.background = `radial-gradient(1200px 800px at 50% -10%, ${Game.shade ? Game.shade(bg.color, 25) : bg.color} 0%, ${bg.color} 55%) fixed`;
+}
+
+/* ---------------- Default player factory (client-side defaults for
+   backfilling any fields an older/partial save might be missing) ---------------- */
+function newPlayer(username){
+  return {
+    username, createdAt: Date.now(),
+    customAvatarUrl: null,
+    customBackgroundUrl: null, customBackgroundType: null, ultraVipUnlocked: false,
+    level:1, xp:0,
+    coins:300, gems:50,
+    stats:{wins:0, losses:0, matchesPlayed:0, totalPoints:0, winStreak:0, bestStreak:0, perfectGames:0, tournamentsWon:0, levelsCleared:0},
+    rating:1000,
+    inventory:{paddles:['paddle_classic'], balls:['ball_classic'], arenas:['arena_classic'], outfits:['outfit_classic'], effects:['effect_none'], animations:['anim_none'], avatars:['avatar_default'], backgrounds:['bg_default']},
+    equipped:{paddle:'paddle_classic', ball:'ball_classic', arena:'arena_classic', outfit:'outfit_classic', effect:'effect_none', animation:'anim_none', avatar:'avatar_default', background:'bg_default'},
+    achievements:{}, // id -> true
+    dailyMissions:{date:null, list:[], session:{}},
+    campaign:{cleared:{}, stars:{}},
+    vip:{active:false, expiresAt:0, activations:0},
+    matchHistory:[],
+    settings:{sfx:true, music:true, shake:true, invert:false}
+  };
+}
+
+/* ---------------- Auth ---------------- */
+const Auth = {
+  showTab(tab){
+    document.getElementById('tabLogin').classList.toggle('active', tab==='login');
+    document.getElementById('tabRegister').classList.toggle('active', tab==='register');
+    document.getElementById('authLoginForm').style.display = tab==='login' ? 'block':'none';
+    document.getElementById('authRegisterForm').style.display = tab==='register' ? 'block':'none';
+    document.getElementById('authError').textContent='';
+  },
+  err(msg){ document.getElementById('authError').textContent = msg; },
+  async register(){
+    const u = document.getElementById('regUser').value.trim();
+    const p = document.getElementById('regPass').value;
+    if(u.length<3) return this.err('Username must be at least 3 characters.');
+    if(p.length<4) return this.err('Password must be at least 4 characters.');
+    this.err('Creating your account…');
+    try{
+      const data = await apiCall('/api/register','POST',{username:u, password:p}, false);
+      LocalCache.saveToken(data.token);
+      await this.enterGame(data.player);
+      toast('Welcome to Ping Pong VIP, '+u+'!');
+    }catch(e){ this.err(e.message); }
+  },
+  async login(){
+    const u = document.getElementById('loginUser').value.trim();
+    const p = document.getElementById('loginPass').value;
+    if(!u || !p) return this.err('Enter your username and password.');
+    this.err('Signing in…');
+    try{
+      const data = await apiCall('/api/login','POST',{username:u, password:p}, false);
+      LocalCache.saveToken(data.token);
+      await this.enterGame(data.player);
+      toast('Welcome back, '+u+'! Progress synced from the server.');
+    }catch(e){ this.err(e.message); }
+  },
+  // try to silently resume a session using a saved token (auto-login on revisit)
+  async tryAutoLogin(){
+    const token = LocalCache.loadToken();
+    if(!token) return false;
+    try{
+      const data = await apiCall('/api/me','GET',null,true);
+      await this.enterGame(data.player);
+      return true;
+    }catch(e){ LocalCache.clearToken(); return false; }
+  },
+  async enterGame(player){
+    // backfill any new fields for older saves, prefer an on-device cache if it's newer looking
+    const cached = LocalCache.load(player.username);
+    const fresh = newPlayer(player.username);
+    // capture the fresh defaults BEFORE they get overwritten below — otherwise
+    // an older save that predates a newer field (like "avatars" or
+    // "backgrounds") would wipe out the default instead of being backfilled.
+    const defaults = { stats: fresh.stats, inventory: fresh.inventory, equipped: fresh.equipped, settings: fresh.settings, vip: fresh.vip };
+    const base = Object.assign(fresh, player);
+    STATE = base;
+    STATE.stats = Object.assign({}, defaults.stats, player.stats||{});
+    STATE.inventory = Object.assign({}, defaults.inventory, player.inventory||{});
+    STATE.equipped = Object.assign({}, defaults.equipped, player.equipped||{});
+    STATE.settings = Object.assign({}, defaults.settings, player.settings||{});
+    STATE.vip = Object.assign({}, defaults.vip, player.vip||{});
+    STATE.isAdmin = !!player.isAdmin;
+    CURRENT_USER = player.username;
+    Missions.rollIfNeeded();
+    document.getElementById('screen-auth').classList.remove('active');
+    document.getElementById('mainShell').style.display='flex';
+    UI.renderAll();
+    applyBackground();
+    Nav.go('home');
+    LB.push();
+    Net.connect();
+    if(STATE.isAdmin) Nav.addAdminIfNeeded();
+    // custom background media lives in its own table (kept out of the main
+    // save payload since it can be several MB) — fetch it separately here
+    if(STATE.ultraVipUnlocked){
+      apiCall('/api/my-background','GET',null,true).then(bg=>{
+        if(bg && bg.data){
+          STATE.customBackgroundUrl = bg.data;
+          STATE.customBackgroundType = bg.type;
+          applyBackground();
+        }
+      }).catch(()=>{});
+    }
+  },
+  async logout(){
+    await Save.now();
+    Net.disconnect();
+    LocalCache.clearToken();
+    STATE=null; CURRENT_USER=null;
+    document.getElementById('mainShell').style.display='none';
+    document.getElementById('screen-game').classList.remove('active');
+    document.getElementById('screen-auth').classList.add('active');
+    document.getElementById('loginPass').value='';
+  }
+};
+
+/* ---------------- Save (debounced save to server + on-device cache) ---------------- */
+const Save = {
+  timer:null,
+  queue(){ clearTimeout(this.timer); this.timer=setTimeout(()=>this.now(), 600); },
+  async now(){
+    if(!STATE) return;
+    LocalCache.save(STATE.username, STATE); // always keep an on-device copy first (this one's fine to include the image/video, it's local only)
+    try{
+      // Custom background media is uploaded via its own endpoint and stored
+      // separately server-side — never send it through the regular save,
+      // or every routine autosave would carry a multi-MB payload with it.
+      const { customBackgroundUrl, ...lightState } = STATE;
+      const data = await apiCall('/api/me','PUT',{state:lightState}, true);
+      // adopt server-validated numeric fields (server clamps against tampering)
+      if(data && data.player){
+        STATE.coins = data.player.coins; STATE.gems = data.player.gems; STATE.rating = data.player.rating;
+      }
+    }catch(e){ console.warn('Cloud save failed, kept on-device copy:', e.message); }
+  }
+};
+
+/* ---------------- Navigation ---------------- */
+const NAV_ITEMS = [
+  {id:'home', label:'Home', icon:'🏠'}, {id:'play', label:'Play', icon:'🎮'}, {id:'levels', label:'Levels', icon:'🗺️'},
+  {id:'shop', label:'Shop', icon:'🛒'}, {id:'vip', label:'VIP', icon:'👑'}, {id:'inventory', label:'Bag', icon:'🎒'},
+  {id:'leaderboard', label:'Ranks', icon:'📊'}, {id:'achievements', label:'Awards', icon:'🏆'}, {id:'profile', label:'Profile', icon:'👤'},
+  {id:'settings', label:'Settings', icon:'⚙️'}
+];
+const Nav = {
+  current:'home',
+  init(){
+    const bn = document.getElementById('bottomnav');
+    bn.innerHTML = NAV_ITEMS.map(i=>`<button class="navbtn" id="nav-${i.id}" onclick="Nav.go('${i.id}')"><span style="font-size:18px;">${i.icon}</span>${i.label}</button>`).join('');
+  },
+  addAdminIfNeeded(){
+    if(document.getElementById('nav-admin')) return;
+    const bn = document.getElementById('bottomnav');
+    const btn = document.createElement('button');
+    btn.className='navbtn'; btn.id='nav-admin'; btn.onclick=()=>Nav.go('admin');
+    btn.innerHTML = `<span style="font-size:18px;">🛠️</span>Admin`;
+    bn.appendChild(btn);
+  },
+  go(id){
+    Sound.click();
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    const target = document.getElementById('screen-'+id);
+    if(target) target.classList.add('active');
+    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+    const nb = document.getElementById('nav-'+id); if(nb) nb.classList.add('active');
+    this.current = id;
+    window.scrollTo(0,0);
+    if(id==='shop') Shop.render();
+    if(id==='vip') Shop.renderVip();
+    if(id==='inventory') Inventory.render();
+    if(id==='leaderboard') LB.render();
+    if(id==='achievements') Achievements.render();
+    if(id==='levels') Levels.render();
+    if(id==='offline') Offline.render();
+    if(id==='online') Online.render();
+    if(id==='profile') Profile.render();
+    if(id==='home') Home.render();
+    if(id==='admin') AdminPanel.load();
+  }
+};
+
+/* ---------------- Admin panel (owner/admin-only controls) ---------------- */
+const AdminPanel = {
+  async inspect(){
+    const username = document.getElementById('adminInspectUser').value.trim();
+    const el = document.getElementById('adminInspectResult');
+    if(!username){ toast('Enter a username.'); return; }
+    el.innerHTML = '<p class="muted">Loading…</p>';
+    try{
+      const p = await apiCall('/api/admin/user/'+encodeURIComponent(username),'GET',null,true);
+      const invRows = Object.entries(p.inventory||{}).map(([cat, ids])=>
+        `<div style="margin-bottom:6px;"><b style="font-size:12.5px; text-transform:capitalize;">${cat}</b>: <span class="muted" style="font-size:12px;">${(ids||[]).join(', ')||'—'}</span></div>`
+      ).join('');
+      const equipRows = Object.entries(p.equipped||{}).map(([slot, id])=>
+        `<span class="tag" style="margin:2px;">${slot}: ${id}</span>`
+      ).join(' ');
+      const histRows = (p.matchHistory||[]).slice(0,8).map(m=>
+        `<div class="row" style="font-size:12px; padding:4px 0; border-bottom:1px solid var(--line);"><span>${m.win?'✅':'❌'} vs ${m.opponent} <span class="tag">${m.mode}</span></span><span class="scoreboard">${m.score}</span></div>`
+      ).join('') || '<p class="muted" style="font-size:12px;">No matches yet.</p>';
+      el.innerHTML = `
+        <div class="card" style="background:var(--bg-elev-2); margin-bottom:0;">
+          <div class="row">
+            <b style="font-family:'Teko'; font-size:20px;">${p.username}</b>
+            <span>${p.isAdmin?'<span class="tag vip">ADMIN</span>':''} ${p.isBanned?'<span class="tag locked">BANNED</span>':''} ${p.vip && p.vip.active?'<span class="tag vip">VIP</span>':''} ${p.ultraVipUnlocked?'<span class="tag" style="color:#b89bff;border-color:#7a5cff;">ULTRA VIP</span>':''}</span>
+          </div>
+          <div class="grid cols-3" style="margin:10px 0;">
+            <div class="statmini"><div class="v">${p.level}</div><div class="l">Level</div></div>
+            <div class="statmini"><div class="v">${p.stats.wins}</div><div class="l">Wins</div></div>
+            <div class="statmini"><div class="v">${p.stats.losses}</div><div class="l">Losses</div></div>
+          </div>
+          <div class="muted" style="font-size:12.5px; margin-bottom:8px;">🪙 ${p.coins} coins &nbsp; 💎 ${p.gems} gems &nbsp; Rating ${p.rating}</div>
+          <div style="margin-bottom:10px;"><b style="font-size:13px;">Equipped</b><br>${equipRows}</div>
+          <div style="margin-bottom:10px;"><b style="font-size:13px;">Inventory</b>${invRows}</div>
+          <div><b style="font-size:13px;">Recent Matches</b>${histRows}</div>
+        </div>`;
+    }catch(e){ el.innerHTML = `<p class="muted">${e.message}</p>`; }
+  },
+  async load(){
+    const el = document.getElementById('adminUserList');
+    el.innerHTML = '<p class="muted">Loading accounts…</p>';
+    try{
+      const data = await apiCall('/api/admin/users','GET',null,true);
+      el.innerHTML = data.users.map(u=>`
+        <div class="row" style="padding:8px 0; border-bottom:1px solid var(--line); font-size:13px;">
+          <span>${u.username} ${u.is_admin?'<span class="tag vip">ADMIN</span>':''} ${u.is_banned?'<span class="tag locked">BANNED</span>':''}</span>
+          <span class="muted">rating ${u.rating}</span>
+        </div>`).join('') || '<p class="muted">No accounts yet.</p>';
+    }catch(e){ el.innerHTML = `<p class="muted">${e.message}</p>`; }
+  },
+  async grant(){
+    const username = document.getElementById('adminGrantUser').value.trim();
+    const coins = Number(document.getElementById('adminGrantCoins').value)||0;
+    const gems = Number(document.getElementById('adminGrantGems').value)||0;
+    if(!username) return toast('Enter a username.');
+    try{
+      await apiCall('/api/admin/grant','POST',{username,coins,gems},true);
+      toast('Granted to '+username);
+      this.load();
+      // if you just granted currency to your OWN account, refresh your own
+      // balance too — otherwise the topbar keeps showing stale numbers
+      // until your next login.
+      if(STATE && username.toLowerCase()===STATE.username.toLowerCase()){
+        const data = await apiCall('/api/me','GET',null,true);
+        STATE.coins = data.player.coins; STATE.gems = data.player.gems;
+        UI.renderTop(); Home.render();
+      }
+    }
+    catch(e){ toast(e.message); }
+  },
+  async ban(banned){
+    const username = document.getElementById('adminBanUser').value.trim();
+    if(!username) return toast('Enter a username.');
+    try{ await apiCall('/api/admin/ban','POST',{username,banned},true); toast((banned?'Banned ':'Unbanned ')+username); this.load(); }
+    catch(e){ toast(e.message); }
+  }
+};
+
+/* ---------------- XP / Leveling ---------------- */
+const Progression = {
+  xpForLevel(lvl){ return Math.round(100 * Math.pow(lvl, 1.35)); },
+  async addXp(amount, reason){
+    if(STATE.vip.active) amount = Math.round(amount * 1.5);
+    STATE.xp += amount;
+    let leveled=false;
+    while(STATE.xp >= this.xpForLevel(STATE.level)){
+      STATE.xp -= this.xpForLevel(STATE.level);
+      STATE.level++;
+      leveled=true;
+      this.onLevelUp(STATE.level);
+    }
+    toast('+'+amount+' XP'+(reason?(' · '+reason):''));
+    if(leveled){ Sound.win(); toast('🎉 Level Up! You are now Level '+STATE.level, true); }
+    UI.renderTop(); Home.render();
+    Save.queue();
+    LB.push();
+    Achievements.check();
+  },
+  onLevelUp(lvl){
+    STATE.coins += 50;
+    if(lvl % 5 === 0) STATE.gems += 20;
+    // unlock content by level
+    const unlocks = {3:'paddle_blue', 5:'ball_glow', 7:'arena_night', 10:'outfit_pro', 12:'ball_fire', 15:'paddle_carbon', 20:'arena_beach'};
+    if(unlocks[lvl]){
+      const type = unlocks[lvl].startsWith('paddle')?'paddles':unlocks[lvl].startsWith('ball')?'balls':unlocks[lvl].startsWith('arena')?'arenas':'outfits';
+      if(!STATE.inventory[type].includes(unlocks[lvl])){ STATE.inventory[type].push(unlocks[lvl]); toast('🔓 Unlocked new item: check your Inventory!'); }
+    }
+  }
+};
+
+/* ---------------- Missions ---------------- */
+const Missions = {
+  todayKey(){ const d=new Date(); return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate(); },
+  rollIfNeeded(){
+    const tk = this.todayKey();
+    if(STATE.dailyMissions.date !== tk){
+      const shuffled = [...MISSION_POOL].sort(()=>Math.random()-.5).slice(0,3);
+      STATE.dailyMissions = {date:tk, list: shuffled.map(m=>({...m, progress:0, claimed:false})), session:{sessionWins:0,sessionMatches:0,sessionPoints:0,sessionStreak:0,sessionSmashes:0}};
+      Save.queue();
+    }
+  },
+  record(stat, amount=1){
+    if(!STATE) return;
+    STATE.dailyMissions.session[stat] = (STATE.dailyMissions.session[stat]||0) + amount;
+    STATE.dailyMissions.list.forEach(m=>{
+      if(m.stat===stat && !m.claimed){ m.progress = Math.min(m.target, STATE.dailyMissions.session[stat]); }
+    });
+    Save.queue();
+  },
+  async claim(id){
+    const m = STATE.dailyMissions.list.find(x=>x.id===id);
+    if(!m || m.claimed || m.progress<m.target) return;
+    m.claimed=true;
+    STATE.coins += m.reward.coins;
+    await Progression.addXp(m.reward.xp, 'Mission');
+    toast('Mission complete: +'+m.reward.coins+' coins');
+    Sound.coin();
+    Home.render(); UI.renderTop(); Save.queue();
+  }
+};
+
+/* ---------------- Achievements ---------------- */
+const Achievements = {
+  check(){
+    if(!STATE) return;
+    const values = {
+      wins: STATE.stats.wins, bestStreak: STATE.stats.bestStreak, level: STATE.level,
+      perfectGames: STATE.stats.perfectGames, vipActivations: STATE.vip.activations,
+      levelsCleared: STATE.stats.levelsCleared, tournamentsWon: STATE.stats.tournamentsWon,
+      matchesPlayed: STATE.stats.matchesPlayed,
+      itemsOwned: Object.values(STATE.inventory).reduce((a,b)=>a+b.length,0)
+    };
+    let any=false;
+    ACHIEVEMENTS.forEach(a=>{
+      if(!STATE.achievements[a.id] && values[a.stat] >= a.target){
+        STATE.achievements[a.id]=true; any=true;
+        STATE.coins += 100; STATE.gems += 10;
+        toast('🏆 Achievement unlocked: '+a.name+' (+100 coins, +10 gems)', true);
+      }
+    });
+    if(any){ UI.renderTop(); Save.queue(); }
+  },
+  render(){
+    const el = document.getElementById('achList');
+    el.innerHTML = ACHIEVEMENTS.map(a=>{
+      const done = !!STATE.achievements[a.id];
+      const values = {wins: STATE.stats.wins, bestStreak: STATE.stats.bestStreak, level: STATE.level, perfectGames: STATE.stats.perfectGames, vipActivations: STATE.vip.activations, levelsCleared: STATE.stats.levelsCleared, tournamentsWon: STATE.stats.tournamentsWon, matchesPlayed: STATE.stats.matchesPlayed, itemsOwned: Object.values(STATE.inventory).reduce((a2,b)=>a2+b.length,0)};
+      const cur = Math.min(a.target, values[a.stat]||0);
+      return `<div class="ach ${done?'done':''}">
+        <div class="icon">${a.icon}</div>
+        <div style="flex:1;">
+          <div class="row"><b style="font-size:14px;">${a.name}</b>${done?'<span class="tag" style="color:var(--good);border-color:#1c5c3c;">DONE</span>':''}</div>
+          <div class="muted" style="font-size:12px;">${a.desc}</div>
+          ${!done?`<div class="progress" style="margin-top:6px;"><div style="width:${(cur/a.target*100)}%"></div></div>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+};
+
+/* ---------------- Leaderboard (live from server) ---------------- */
+const LB = {
+  async push(){
+    // the server derives leaderboard entries from each account's saved state,
+    // so a normal Save.now() already keeps this up to date — nothing extra to send.
+    return;
+  },
+  async fetchAll(){
+    try{
+      const data = await apiCall('/api/leaderboard','GET',null,false);
+      return data.leaderboard || [];
+    }catch(e){ return []; }
+  },
+  async render(){
+    const el = document.getElementById('lbList');
+    el.innerHTML = '<p class="muted">Loading global rankings…</p>';
+    const rows = await this.fetchAll();
+    if(rows.length===0){ el.innerHTML = '<p class="muted">No ranked players yet — be the first!</p>'; return; }
+    el.innerHTML = rows.slice(0,50).map((r,i)=>{
+      const rankClass = i===0?'top1':i===1?'top2':i===2?'top3':'';
+      const meClass = STATE && r.username.toLowerCase()===STATE.username.toLowerCase() ? 'me':'';
+      return `<div class="lbrow ${rankClass} ${meClass}">
+        <div class="rank">#${i+1}</div>
+        <div class="avatar" style="width:32px;height:32px;font-size:13px;${r.vip?'border-color:var(--gold)':''}">${r.username[0].toUpperCase()}</div>
+        <div style="flex:1;"><b>${r.username}</b>${r.vip?' <span class="tag vip">VIP</span>':''}<div class="muted" style="font-size:11px;">Level ${r.level} · ${r.wins} wins</div></div>
+        <div class="scoreboard" style="font-size:16px;">${r.rating}</div>
+      </div>`;
+    }).join('');
+  },
+  async renderPreview(){
+    const el = document.getElementById('onlineLbPreview');
+    const rows = await this.fetchAll();
+    el.innerHTML = rows.slice(0,5).map((r,i)=>`<div class="lbrow"><div class="rank">#${i+1}</div><div style="flex:1;">${r.username}</div><div class="scoreboard">${r.rating}</div></div>`).join('') || '<p class="muted">No players ranked yet.</p>';
+  }
+};
+
+/* ---------------- UI rendering ---------------- */
+const UI = {
+  renderAll(){ this.renderTop(); Home.render(); Nav.go('home'); },
+  renderTop(){
+    if(!STATE) return;
+    document.getElementById('topCoins').textContent = STATE.coins;
+    document.getElementById('topGems').textContent = STATE.gems;
+    document.getElementById('lvlBadgeNum').textContent = STATE.level;
+    const pct = Math.min(100, Math.round(STATE.xp / Progression.xpForLevel(STATE.level) * 100));
+    document.getElementById('lvlBadge').style.setProperty('--p', pct);
+  }
+};
+
+const Home = {
+  render(){
+    if(!STATE) return;
+    document.getElementById('homeUsername').textContent = STATE.username;
+    document.getElementById('homeAvatar').textContent = STATE.username[0].toUpperCase();
+    setAvatarEl(document.getElementById('homeAvatar'), STATE.username[0].toUpperCase());
+    document.getElementById('homeAvatar').classList.toggle('vip', STATE.vip.active);
+    document.getElementById('homeLevelNum').textContent = STATE.level;
+    document.getElementById('homeTagline').textContent = `Level ${STATE.level} · ${Titles.forLevel(STATE.level)}${STATE.vip.active?' · VIP':''}`;
+    const need = Progression.xpForLevel(STATE.level);
+    document.getElementById('homeXpText').textContent = `${STATE.xp} / ${need}`;
+    document.getElementById('homeXpBar').style.width = Math.min(100, STATE.xp/need*100)+'%';
+    document.getElementById('statWins').textContent = STATE.stats.wins;
+    document.getElementById('statLosses').textContent = STATE.stats.losses;
+    const wr = STATE.stats.matchesPlayed ? Math.round(STATE.stats.wins/STATE.stats.matchesPlayed*100) : 0;
+    document.getElementById('statWinrate').textContent = wr+'%';
+    // missions
+    document.getElementById('homeMissions').innerHTML = STATE.dailyMissions.list.map(m=>`
+      <div class="row" style="padding:8px 0; border-bottom:1px solid var(--line);">
+        <div style="flex:1;">
+          <div style="font-size:13px;">${m.desc}</div>
+          <div class="progress" style="margin-top:5px;"><div style="width:${Math.min(100,m.progress/m.target*100)}%"></div></div>
+        </div>
+        <div style="margin-left:10px;">
+          ${m.claimed ? '<span class="tag" style="color:var(--good);border-color:#1c5c3c;">Claimed</span>' :
+            m.progress>=m.target ? `<button class="btn gold small" onclick="Missions.claim('${m.id}')">Claim</button>` :
+            `<span class="muted" style="font-size:12px;">${m.progress}/${m.target}</span>`}
+        </div>
+      </div>`).join('');
+    // recent matches
+    const recent = STATE.matchHistory.slice(-4).reverse();
+    document.getElementById('homeRecent').innerHTML = recent.length ? recent.map(m=>`
+      <div class="row" style="padding:6px 0; border-bottom:1px solid var(--line); font-size:13px;">
+        <span>${m.win?'✅ Win':'❌ Loss'} vs ${m.opponent} <span class="muted">(${m.mode})</span></span>
+        <span class="scoreboard">${m.score}</span>
+      </div>`).join('') : '<p class="muted">No matches played yet — jump into Quick Play!</p>';
+  }
+};
+const Titles = { forLevel(l){ if(l<3) return 'Rookie Paddler'; if(l<7) return 'Club Player'; if(l<12) return 'Rally Specialist'; if(l<20) return 'Table Tactician'; if(l<30) return 'Spin Master'; return 'Grandmaster'; } };
+
+const Profile = {
+  render(){
+    document.getElementById('profUsername').textContent = STATE.username;
+    document.getElementById('profAvatar').textContent = STATE.username[0].toUpperCase();
+    setAvatarEl(document.getElementById('profAvatar'), STATE.username[0].toUpperCase());
+    document.getElementById('profAvatar').classList.toggle('vip', STATE.vip.active);
+    document.getElementById('profJoined').textContent = 'Joined ' + new Date(STATE.createdAt).toLocaleDateString();
+    document.getElementById('pStatMatches').textContent = STATE.stats.matchesPlayed;
+    document.getElementById('pStatWins').textContent = STATE.stats.wins;
+    document.getElementById('pStatStreak').textContent = STATE.stats.bestStreak;
+    const hist = STATE.matchHistory.slice().reverse();
+    document.getElementById('profHistory').innerHTML = hist.length ? hist.map(m=>`
+      <div class="row" style="padding:7px 0; border-bottom:1px solid var(--line); font-size:13px;">
+        <span>${m.win?'✅':'❌'} vs ${m.opponent} <span class="tag">${m.mode}</span></span>
+        <span class="scoreboard">${m.score}</span>
+      </div>`).join('') : '<p class="muted">No matches yet.</p>';
+    this.renderConnectedAccounts();
+  },
+  renderConnectedAccounts(){
+    const providers = [
+      {id:'google', name:'Google', icon:'🔵'},
+      {id:'facebook', name:'Facebook', icon:'🔷'},
+      {id:'x', name:'X (Twitter)', icon:'⬛'}
+    ];
+    const linked = STATE.linkedAccounts || {};
+    document.getElementById('connectedAccountsList').innerHTML = providers.map(p=>{
+      const isLinked = !!linked[p.id];
+      return `<div class="row" style="padding:8px 0; border-bottom:1px solid var(--line);">
+        <span>${p.icon} ${p.name} ${isLinked?`<span class="muted" style="font-size:11.5px;">— ${linked[p.id]}</span>`:''}</span>
+        ${isLinked
+          ? `<button class="btn ghost small" onclick="Profile.unlinkAccount('${p.id}')">Unlink</button>`
+          : `<button class="btn ghost small" onclick="Profile.linkComingSoon('${p.name}')">Link</button>`}
+      </div>`;
+    }).join('');
+  },
+  linkComingSoon(name){
+    modal(`<h3>${name} Sign-In</h3><p class="muted">Linking ${name} isn't set up on this server yet — it needs a one-time developer registration with ${name} first. Ask your admin to finish that setup, then this button will work.</p><button class="btn primary block" onclick="closeModal()">Got it</button>`);
+  },
+  async unlinkAccount(provider){
+    try{
+      await apiCall('/api/unlink-account','POST',{provider},true);
+      STATE.linkedAccounts = STATE.linkedAccounts || {};
+      delete STATE.linkedAccounts[provider];
+      this.renderConnectedAccounts();
+      toast('Account unlinked.');
+    }catch(e){ toast(e.message); }
+  },
+  changeAvatarPrompt(){
+    const owned = SHOP_CATALOG.avatars.filter(a=>STATE.inventory.avatars.includes(a.id));
+    modal(`<h3>Change Avatar</h3>
+      <div class="grid cols-3" style="margin:14px 0;">
+        ${owned.map(a=>`<button class="btn ${(!STATE.customAvatarUrl && STATE.equipped.avatar===a.id)?'primary':'ghost'}" style="font-size:24px; padding:14px;" onclick="Profile.pickAvatar('${a.id}')">${a.icon || STATE.username[0].toUpperCase()}</button>`).join('')}
+      </div>
+      <p class="muted" style="font-size:12px;">Want more options? Check the Shop's Avatars tab.</p>
+      <button class="btn blue block" style="margin-top:10px;" onclick="document.getElementById('avatarFileInput').click()">📁 Upload a photo from your device</button>
+      ${STATE.customAvatarUrl ? `<button class="btn accent block" style="margin-top:8px;" onclick="Profile.removeCustomAvatar()">Remove uploaded photo</button>` : ''}
+      <button class="btn ghost block" style="margin-top:8px;" onclick="closeModal()">Close</button>`);
+  },
+  handleAvatarFile(event){
+    const file = event.target.files && event.target.files[0];
+    event.target.value = ''; // reset so picking the same file again still fires change
+    if(!file) return;
+    if(!file.type.startsWith('image/')){ toast('Please choose an image file.'); return; }
+    if(file.size > 8*1024*1024){ toast('Image is too large — please pick one under 8MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        // downscale + crop to a square so it's small to store and consistent to display
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(size/img.width, size/img.height);
+        const w = img.width*scale, h = img.height*scale;
+        ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        STATE.customAvatarUrl = dataUrl;
+        Save.queue();
+        setAvatarEl(document.getElementById('homeAvatar'), STATE.username[0].toUpperCase());
+        setAvatarEl(document.getElementById('profAvatar'), STATE.username[0].toUpperCase());
+        closeModal();
+        toast('Profile photo updated!');
+      };
+      img.onerror = ()=> toast('Could not read that image — please try a different file.');
+      img.src = e.target.result;
+    };
+    reader.onerror = ()=> toast('Could not read that file.');
+    reader.readAsDataURL(file);
+  },
+  removeCustomAvatar(){
+    STATE.customAvatarUrl = null;
+    Save.queue();
+    setAvatarEl(document.getElementById('homeAvatar'), STATE.username[0].toUpperCase());
+    setAvatarEl(document.getElementById('profAvatar'), STATE.username[0].toUpperCase());
+    closeModal();
+    toast('Photo removed — back to your selected avatar.');
+  },
+  pickAvatar(id){
+    STATE.equipped.avatar = id;
+    STATE.customAvatarUrl = null; // picking a catalog avatar overrides any uploaded photo
+    Save.queue();
+    setAvatarEl(document.getElementById('homeAvatar'), STATE.username[0].toUpperCase());
+    setAvatarEl(document.getElementById('profAvatar'), STATE.username[0].toUpperCase());
+    closeModal();
+    toast('Avatar updated!');
+  },
+  changeUsernamePrompt(){
+    modal(`<h3>Change Username</h3>
+      <input id="unNew" placeholder="New username" value="${STATE.username}" style="width:100%; padding:11px; margin:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+      <input id="unPass" type="password" placeholder="Current password" style="width:100%; padding:11px; margin:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+      <p id="unError" style="color:var(--danger); font-size:12.5px; min-height:16px;"></p>
+      <div class="grid cols-2">
+        <button class="btn ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn primary" onclick="Profile.submitUsernameChange()">Update</button>
+      </div>`);
+  },
+  async submitUsernameChange(){
+    const newUsername = document.getElementById('unNew').value.trim();
+    const password = document.getElementById('unPass').value;
+    try{
+      const data = await apiCall('/api/change-username','POST',{newUsername, password},true);
+      LocalCache.saveToken(data.token);
+      STATE.username = data.username;
+      CURRENT_USER = data.username;
+      closeModal();
+      toast('Username updated!');
+      UI.renderAll(); this.render();
+    }catch(e){ document.getElementById('unError').textContent = e.message; }
+  }
+};
+
+/* ---------------- Shop ---------------- */
+const Shop = {
+  activeTab:'paddles',
+  render(){
+    document.getElementById('shopCoins').textContent = STATE.coins;
+    document.getElementById('shopGems').textContent = STATE.gems;
+    const tabs = Object.keys(SHOP_CATALOG);
+    document.getElementById('shopTabs').innerHTML = tabs.map(t=>`<button class="btn ${this.activeTab===t?'primary':'ghost'} small" onclick="Shop.setTab('${t}')">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
+    const items = SHOP_CATALOG[this.activeTab];
+    document.getElementById('shopGrid').innerHTML = items.map(it=>this.itemCard(it, this.activeTab)).join('');
+  },
+  setTab(t){ this.activeTab=t; this.render(); },
+  itemCard(it, category){
+    const owned = STATE.inventory[category].includes(it.id);
+    const equipped = STATE.equipped[EQUIP_KEY_MAP[category]]===it.id;
+    const lockedVip = it.vip && !STATE.vip.active;
+    return `<div class="item-card" style="border-left:3px solid ${RARITY_COLOR[it.rarity]};">
+      <div class="item-swatch" style="background:${it.color}22;">${it.icon}</div>
+      <div class="item-name">${it.name} ${it.vip?'<span class="tag vip">VIP</span>':''}</div>
+      <div class="tag" style="width:fit-content;">${it.rarity}</div>
+      ${owned ?
+        (equipped ? `<button class="btn small block" disabled>Equipped</button>` : `<button class="btn small block primary" onclick="Inventory.equip('${category}','${it.id}')">Equip</button>`)
+        : lockedVip ? `<button class="btn small block" disabled>VIP Only</button>`
+        : `<button class="btn small block ${it.cur==='gems'?'blue':'gold'}" onclick="Shop.buy('${category}','${it.id}')">${it.price===0?'Free':(it.cur==='gems'?'💎 '+it.price:'🪙 '+it.price)}</button>`}
+    </div>`;
+  },
+  async buy(category, id){
+    const it = SHOP_CATALOG[category].find(x=>x.id===id);
+    if(!it) return;
+    if(it.vip && !STATE.vip.active){ toast('This item requires an active VIP membership.'); return; }
+    const balance = it.cur==='gems' ? STATE.gems : STATE.coins;
+    if(balance < it.price){ toast('Not enough '+(it.cur==='gems'?'gems 💎':'coins 🪙')+'. Visit the VIP shop to top up.'); return; }
+    modal(`<div class="spinner"></div><h3>Processing purchase…</h3><p class="muted">Verifying transaction</p>`);
+    await new Promise(r=>setTimeout(r, 650));
+    if(it.cur==='gems') STATE.gems -= it.price; else STATE.coins -= it.price;
+    STATE.inventory[category].push(id);
+    STATE.equipped[EQUIP_KEY_MAP[category]] = id;
+    closeModal();
+    Sound.coin();
+    toast('✅ Purchased '+it.name+' — delivered to your inventory!', true);
+    UI.renderTop(); this.render(); Save.queue(); Achievements.check();
+    if(EQUIP_KEY_MAP[category]==='avatar'){ setAvatarEl(document.getElementById('homeAvatar'), STATE.username[0].toUpperCase()); setAvatarEl(document.getElementById('profAvatar'), STATE.username[0].toUpperCase()); }
+    if(EQUIP_KEY_MAP[category]==='background') applyBackground();
+  },
+  renderVip(){
+    document.getElementById('vipStatusText').textContent = STATE.vip.active ? ('Active — renews automatically') : 'Not active';
+    document.getElementById('vipBuyBtn').textContent = STATE.vip.active ? 'VIP Active ✓' : 'Activate VIP — 💎 300 / month';
+    document.getElementById('vipBuyBtn').disabled = STATE.vip.active;
+
+    const ultraOn = !!STATE.ultraVipUnlocked;
+    document.getElementById('ultraVipStatusText').textContent = ultraOn ? 'Unlocked — custom backgrounds available below' : 'Not unlocked';
+    document.getElementById('ultraVipBuyBtn').style.display = ultraOn ? 'none' : 'block';
+    document.getElementById('ultraVipUploadSection').style.display = ultraOn ? 'block' : 'none';
+    document.getElementById('ultraVipRemoveBtn').style.display = STATE.customBackgroundUrl ? 'block' : 'none';
+
+    document.getElementById('gemPacks').innerHTML = GEM_PACKS.map(p=>`
+      <div class="item-card">
+        <div class="item-swatch" style="background:#4da8ff22;">💎</div>
+        <div class="item-name">${p.gems} Gems ${p.bonus?('<span class=\"tag\" style=\"color:var(--good);border-color:#1c5c3c;\">'+p.bonus+'</span>'):''}</div>
+        <button class="btn blue small block" onclick="Shop.buyGems('${p.id}')">${p.price}</button>
+      </div>`).join('');
+    const vipItems = [];
+    Object.entries(SHOP_CATALOG).forEach(([cat, items])=> items.filter(i=>i.vip).forEach(i=> vipItems.push(this.itemCard(i,cat))));
+    document.getElementById('vipItemsGrid').innerHTML = vipItems.join('');
+  },
+  async buyGems(packId){
+    const pack = GEM_PACKS.find(p=>p.id===packId);
+    modal(`<h3>Confirm Purchase</h3>
+      <p class="muted">${pack.gems} Gems for ${pack.price}</p>
+      <p class="muted" id="payStatus"></p>
+      <div class="grid cols-2" style="margin-top:14px;">
+        <button class="btn ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn gold" onclick="Shop.confirmGemPurchase('${packId}')">Pay ${pack.price}</button>
+      </div>
+      <p class="muted" style="font-size:10.5px; margin-top:12px;">You'll be redirected to Safepay's secure checkout to complete payment. Gems are credited automatically once payment is confirmed.</p>`);
+  },
+  async confirmGemPurchase(packId){
+    document.getElementById('modalContent').innerHTML = `<div class="spinner"></div><h3>Starting secure checkout…</h3><p class="muted">Redirecting you to Safepay</p>`;
+    try{
+      const data = await apiCall('/api/gems/checkout','POST',{packId}, true);
+      window.location.href = data.url; // leaves the app — Safepay's hosted payment page
+    }catch(e){
+      document.getElementById('modalContent').innerHTML = `<h3>Payment unavailable</h3><p class="muted">${e.message}</p><button class="btn ghost block" onclick="closeModal()">Close</button>`;
+    }
+  },
+  async buyVipMembership(){
+    if(STATE.vip.active) return;
+    if(STATE.gems < 300){ toast('You need 💎 300 to activate VIP.'); return; }
+    modal(`<div class="spinner"></div><h3>Activating VIP…</h3><p class="muted">Processing membership</p>`);
+    await new Promise(r=>setTimeout(r,800));
+    STATE.gems -= 300;
+    STATE.vip.active = true;
+    STATE.vip.activations = (STATE.vip.activations||0)+1;
+    STATE.vip.expiresAt = Date.now() + 1000*60*60*24*30;
+    closeModal();
+    toast('👑 VIP activated! Enjoy +50% XP and exclusive items.', true);
+    Sound.win();
+    UI.renderTop(); Shop.renderVip(); LB.push(); Save.queue(); Achievements.check();
+  },
+  async buyUltraVip(){
+    if(STATE.ultraVipUnlocked) return;
+    const ULTRA_VIP_PRICE = 500; // costs more than base VIP (300), one-time unlock
+    if(STATE.gems < ULTRA_VIP_PRICE){ toast('You need 💎 '+ULTRA_VIP_PRICE+' to unlock Ultra VIP.'); return; }
+    modal(`<div class="spinner"></div><h3>Unlocking Ultra VIP…</h3><p class="muted">Processing</p>`);
+    await new Promise(r=>setTimeout(r,800));
+    STATE.gems -= ULTRA_VIP_PRICE;
+    STATE.ultraVipUnlocked = true;
+    closeModal();
+    toast('🎬 Ultra VIP unlocked! You can now upload a custom background below.', true);
+    Sound.win();
+    UI.renderTop(); Shop.renderVip(); Save.queue(); Achievements.check();
+  },
+  handleBackgroundFile(event){
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    if(!file) return;
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if(!isImage && !isVideo){ toast('Please choose an image or video file.'); return; }
+    if(file.size > 7*1024*1024){ toast('File is too large — please keep it under 7MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = async (e)=>{
+      const dataUrl = e.target.result;
+      modal(`<div class="spinner"></div><h3>Uploading background…</h3><p class="muted">This can take a moment for videos</p>`);
+      try{
+        await apiCall('/api/upload-background','POST',{dataUrl, type: isVideo?'video':'image'}, true);
+        STATE.customBackgroundUrl = dataUrl;
+        STATE.customBackgroundType = isVideo ? 'video' : 'image';
+        applyBackground();
+        closeModal();
+        Shop.renderVip();
+        toast('Background updated!');
+      }catch(err){
+        closeModal();
+        toast(err.message);
+      }
+    };
+    reader.onerror = ()=> toast('Could not read that file.');
+    reader.readAsDataURL(file);
+  },
+  async removeCustomBackground(){
+    try{
+      await apiCall('/api/remove-background','POST',{},true);
+      STATE.customBackgroundUrl = null;
+      STATE.customBackgroundType = null;
+      applyBackground();
+      Shop.renderVip();
+      toast('Custom background removed.');
+    }catch(e){ toast(e.message); }
+  }
+};
+
+/* ---------------- Inventory ---------------- */
+const Inventory = {
+  activeTab:'paddles',
+  render(){
+    document.getElementById('invTabs').innerHTML = Object.keys(SHOP_CATALOG).map(t=>`<button class="btn ${this.activeTab===t?'primary':'ghost'} small" onclick="Inventory.setTab('${t}')">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
+    const owned = SHOP_CATALOG[this.activeTab].filter(i=>STATE.inventory[this.activeTab].includes(i.id));
+    document.getElementById('invGrid').innerHTML = owned.map(it=>Shop.itemCard(it, this.activeTab)).join('') || '<p class="muted">No items yet — visit the Shop!</p>';
+  },
+  setTab(t){ this.activeTab=t; this.render(); },
+  equip(category, id){
+    STATE.equipped[EQUIP_KEY_MAP[category]] = id;
+    toast('Equipped!');
+    Save.queue();
+    Shop.render(); Inventory.render();
+    if(category==='avatars'){ setAvatarEl(document.getElementById('homeAvatar'), STATE.username[0].toUpperCase()); setAvatarEl(document.getElementById('profAvatar'), STATE.username[0].toUpperCase()); }
+    if(category==='backgrounds') applyBackground();
+  }
+};
+
+/* ---------------- Settings ---------------- */
+const Settings = {
+  changePasswordPrompt(){
+    modal(`<h3>Change Password</h3>
+      <input id="cpCurrent" type="password" placeholder="Current password" style="width:100%; padding:11px; margin:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+      <input id="cpNew" type="password" placeholder="New password" style="width:100%; padding:11px; margin:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--bg-elev-2); color:var(--text);">
+      <p id="cpError" style="color:var(--danger); font-size:12.5px; min-height:16px;"></p>
+      <div class="grid cols-2">
+        <button class="btn ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn primary" onclick="Settings.submitPasswordChange()">Update</button>
+      </div>`);
+  },
+  async submitPasswordChange(){
+    const currentPassword = document.getElementById('cpCurrent').value;
+    const newPassword = document.getElementById('cpNew').value;
+    try{
+      await apiCall('/api/change-password','POST',{currentPassword,newPassword},true);
+      closeModal();
+      toast('Password updated successfully.');
+    }catch(e){ document.getElementById('cpError').textContent = e.message; }
+  },
+  toggle(key){
+    STATE.settings[key] = !STATE.settings[key];
+    document.getElementById('sw'+key[0].toUpperCase()+key.slice(1)).classList.toggle('on', STATE.settings[key]);
+    Save.queue();
+  }
+};
+
+/* ---------------- Difficulty & offline setup ---------------- */
+const DIFFICULTIES = [
+  {id:'easy', name:'Easy', desc:'Relaxed reactions', color:'good'},
+  {id:'medium', name:'Medium', desc:'Balanced challenge', color:''},
+  {id:'hard', name:'Hard', desc:'Sharp reflexes', color:''},
+  {id:'insane', name:'Insane', desc:'Near-perfect AI', color:'danger'}
+];
+const Offline = {
+  selectedDiff:'medium', selectedLen:11,
+  render(){
+    document.getElementById('difficultyGrid').innerHTML = DIFFICULTIES.map(d=>`
+      <button class="btn ${this.selectedDiff===d.id?'primary':'ghost'} block" style="padding:14px;" onclick="Offline.pickDiff('${d.id}')">
+        ${d.name}<br><span class="muted" style="font-size:11px;">${d.desc}</span>
+      </button>`).join('');
+    document.getElementById('matchLenGrid').innerHTML = [7,11,21].map(n=>`
+      <button class="btn ${this.selectedLen===n?'primary':'ghost'}" onclick="Offline.pickLen(${n})">${n} pts</button>`).join('');
+  },
+  pickDiff(id){ this.selectedDiff=id; this.render(); },
+  pickLen(n){ this.selectedLen=n; this.render(); }
+};
+
+/* ---------------- Realtime networking layer (Socket.io) ---------------- */
+const Net = {
+  socket:null,
+  connect(){
+    const token = LocalCache.loadToken();
+    if(!token || this.socket) return;
+    this.socket = io({ auth:{ token } });
+    this.socket.on('mm:waiting', ()=>{ /* still in queue */ });
+    this.socket.on('mm:matched', (data)=>{ Online.onMatched(data); });
+    this.socket.on('match:state', (payload)=>{ Game.onRemoteState(payload); });
+    this.socket.on('match:score', (payload)=>{ Game.onRemoteScore(payload); });
+    this.socket.on('match:opponentLeft', ()=>{ if(Game.mode==='online'){ toast('Your opponent disconnected — you win by forfeit.'); Game.forfeitWin(); } });
+  },
+  disconnect(){ if(this.socket){ this.socket.disconnect(); this.socket=null; } }
+};
+
+/* ---------------- Online (real-time matchmaking over WebSockets) ---------------- */
+const Online = {
+  searching:false, timerInt:null, seconds:0, fallbackTimeout:null,
+  render(){ document.getElementById('onlineRating').textContent = STATE.rating; LB.renderPreview(); },
+  findMatch(){
+    if(!Net.socket){ toast('Connecting…'); Net.connect(); }
+    document.getElementById('onlineIdle').style.display='none';
+    document.getElementById('onlineSearching').style.display='block';
+    this.searching=true; this.seconds=0;
+    this.timerInt = setInterval(()=>{ this.seconds++; document.getElementById('onlineSearchTimer').textContent=this.seconds+'s'; }, 1000);
+    Net.socket.emit('mm:join');
+    // if no real player is found quickly, fall back to a rating-matched sparring bot
+    this.fallbackTimeout = setTimeout(()=>{
+      if(!this.searching) return;
+      Net.socket.emit('mm:cancel');
+      this.stopSearchUi();
+      const botNames = ['Ryu_Spin','TableTitan','SmashQueen','ZenPaddler','ViperServe','AceRally'];
+      const bot = botNames[Math.floor(Math.random()*botNames.length)];
+      toast('No human opponent found — matched with sparring bot '+bot);
+      Game.start('online', {opponentName: bot, isBot:true, isHost:true});
+    }, 7000);
+  },
+  onMatched({matchId, opponent, isHost}){
+    clearTimeout(this.fallbackTimeout);
+    this.searching=false;
+    this.stopSearchUi();
+    toast('Opponent found: '+opponent);
+    Game.start('online', {opponentName: opponent, isBot:false, matchId, isHost});
+  },
+  stopSearchUi(){
+    clearInterval(this.timerInt);
+    document.getElementById('onlineIdle').style.display='block';
+    document.getElementById('onlineSearching').style.display='none';
+  },
+  cancelSearch(){
+    this.searching=false;
+    clearTimeout(this.fallbackTimeout);
+    if(Net.socket) Net.socket.emit('mm:cancel');
+    this.stopSearchUi();
+  }
+};
+
+/* ---------------- Levels (campaign) ---------------- */
+const Levels = {
+  render(){
+    const el = document.getElementById('levelsList');
+    el.innerHTML = CAMPAIGN_LEVELS.map(lv=>{
+      const cleared = STATE.campaign.cleared[lv.id];
+      const prevCleared = lv.id===1 || STATE.campaign.cleared[lv.id-1];
+      const locked = !prevCleared;
+      const stars = STATE.campaign.stars[lv.id] || 0;
+      return `<div class="levelnode ${locked?'locked':''}">
+        <div class="num">${locked?'🔒':lv.id}</div>
+        <div style="flex:1;">
+          <div class="row"><b>${lv.name}</b><span class="tag">${lv.difficulty}</span></div>
+          <div class="muted" style="font-size:12.5px;">${lv.objective}</div>
+          ${cleared?`<div class="stars">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div>`:''}
+        </div>
+        <button class="btn ${cleared?'ghost':'primary'} small" ${locked?'disabled':''} onclick="Levels.play(${lv.id})">${cleared?'Replay':'Play'}</button>
+      </div>`;
+    }).join('');
+  },
+  play(id){ Game.start('campaign', {levelId:id}); }
+};
+
+/* ---------------- Tournament ---------------- */
+const Tournament = {
+  round:0, active:false,
+  open(){
+    modal(`<h3>🎖️ Tournament</h3><p class="muted">Win 3 straight matches against escalating CPU opponents to become champion. Lose once and you're out.</p>
+      <button class="btn accent block" onclick="Tournament.start()">Enter Tournament (Free)</button>
+      <button class="btn ghost block" style="margin-top:8px;" onclick="closeModal()">Not now</button>`);
+  },
+  start(){ closeModal(); this.round=1; this.active=true; toast('Tournament started — Round 1 of 3'); Game.start('tournament', {round:1}); },
+  async advance(){
+    this.round++;
+    if(this.round>3){
+      this.active=false;
+      STATE.stats.tournamentsWon = (STATE.stats.tournamentsWon||0)+1;
+      STATE.coins += 500; STATE.gems += 50;
+      toast('🏆 Tournament Champion! +500 coins, +50 gems', true);
+      await Progression.addXp(300,'Tournament Win');
+      Achievements.check();
+      Nav.go('home');
+      return;
+    }
+    toast('Round '+this.round+' — good luck!');
+    Game.start('tournament', {round:this.round});
+  },
+  fail(){ this.active=false; toast('Eliminated from the tournament — try again!'); Nav.go('play'); }
+};
+
+/* =========================================================================
+   GAME ENGINE — canvas pong with physics, AI, and mode handling
+   ======================================================================= */
+const Game = {
+  canvas:null, ctx:null, W:900, H:560,
+  mode:null, meta:null,
+  running:false, paused:false, over:false,
+  p1:null, p2:null, ball:null,
+  targetScore:11, scoreP1:0, scoreP2:0,
+  aiDifficulty:'medium',
+  keys:{}, pointerY:null,
+  rallyHits:0, longestRally:0, smashCount:0, matchSmashes:0,
+  onlineSyncInt:null, matchId:null, isHost:true,
+
+  init(){
+    this.canvas = document.getElementById('pong');
+    this.ctx = this.canvas.getContext('2d');
+    const holder = document.getElementById('gameCanvasHolder');
+    const resize = ()=>{
+      const availW = holder.clientWidth - 20, availH = holder.clientHeight - 20;
+      const ratio = 900/560;
+      let w = availW, h = w/ratio;
+      if(h > availH){ h = availH; w = h*ratio; }
+      this.canvas.style.width = w+'px'; this.canvas.style.height = h+'px';
+    };
+    window.addEventListener('resize', resize); resize();
+    this.canvas.addEventListener('mousemove', e=>{
+      const rect = this.canvas.getBoundingClientRect();
+      this.pointerY = (e.clientY-rect.top) / rect.height * this.H;
+    });
+    this.canvas.addEventListener('touchmove', e=>{
+      e.preventDefault();
+      const rect = this.canvas.getBoundingClientRect();
+      const t = e.touches[0];
+      this.pointerY = (t.clientY-rect.top) / rect.height * this.H;
+    }, {passive:false});
+    document.addEventListener('keydown', e=>{ this.keys[e.key]=true; });
+    document.addEventListener('keyup', e=>{ this.keys[e.key]=false; });
+  },
+
+  startOffline(){
+    this.aiDifficulty = Offline.selectedDiff;
+    this.targetScore = Offline.selectedLen;
+    this.start('offline', {difficulty:this.aiDifficulty});
+  },
+
+  start(mode, meta={}){
+    this.mode = mode; this.meta = meta;
+    this.scoreP1=0; this.scoreP2=0; this.over=false; this.paused=false;
+    this.rallyHits=0; this.longestRally=0; this.matchSmashes=0;
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById('screen-game').classList.add('active');
+
+    let p1name = STATE.username, p2name='CPU', diffLabel='MEDIUM';
+    this.isNetworked = false; this.isHost = true; this.matchId = null;
+    clearInterval(this._netSendInt);
+    if(mode==='offline'){ diffLabel = meta.difficulty.toUpperCase(); this.aiDifficulty = meta.difficulty; this.targetScore = Offline.selectedLen; p2name='CPU · '+diffLabel; document.getElementById('hudModeLabel').textContent='OFFLINE'; }
+    if(mode==='online'){
+      p2name = meta.opponentName; this.targetScore=11;
+      document.getElementById('hudModeLabel').textContent='ONLINE RANKED';
+      if(meta.isBot){ this.aiDifficulty = ['easy','medium','hard'][Math.floor(Math.random()*3)]; }
+      else { this.isNetworked = true; this.isHost = !!meta.isHost; this.matchId = meta.matchId; this.remoteOpponentY = this.H/2-45; this.remoteState = null; this._lastSentScore=[0,0]; }
+    }
+    if(mode==='campaign'){ const lv = CAMPAIGN_LEVELS.find(l=>l.id===meta.levelId); this.currentLevel=lv; this.aiDifficulty=lv.difficulty; this.targetScore = lv.type==='win11'?11:7; p2name='CPU · Lvl '+lv.id; document.getElementById('hudModeLabel').textContent='CAREER · LEVEL '+lv.id; }
+    if(mode==='tournament'){ const diffs=['easy','medium','hard']; this.aiDifficulty = diffs[meta.round-1]||'insane'; this.targetScore=11; p2name='CPU · Round '+meta.round; document.getElementById('hudModeLabel').textContent='TOURNAMENT ROUND '+meta.round; }
+
+    document.getElementById('hudP1Name').textContent = p1name;
+    document.getElementById('hudP2Name').textContent = p2name;
+    document.getElementById('hudP1Avatar').textContent = p1name[0].toUpperCase();
+    setAvatarEl(document.getElementById('hudP1Avatar'), p1name[0].toUpperCase());
+    document.getElementById('hudP2Avatar').textContent = p2name[0].toUpperCase();
+    document.getElementById('hudP1Score').textContent = '0';
+    document.getElementById('hudP2Score').textContent = '0';
+    document.getElementById('gameOverlayMsg').classList.remove('show');
+
+    const arenaColor = SHOP_CATALOG.arenas.find(a=>a.id===STATE.equipped.arena)?.color || '#0fa968';
+    this.arenaColor = arenaColor;
+    this.arenaId = STATE.equipped.arena;
+    this.effectId = STATE.equipped.effect;
+    this.animationId = STATE.equipped.animation;
+    if(!this._starfield || this._starfieldArena!==this.arenaId){
+      this._starfieldArena = this.arenaId;
+      this._starfield = Array.from({length: (this.arenaId==='arena_space'?90: this.arenaId==='arena_night'?45:0)}, ()=>({
+        x: Math.random()*this.W, y: Math.random()*this.H, r: Math.random()*1.6+0.4, phase: Math.random()*Math.PI*2
+      }));
+    }
+    const paddleColor = SHOP_CATALOG.paddles.find(p=>p.id===STATE.equipped.paddle)?.color || '#ff4757';
+    const ballColor = SHOP_CATALOG.balls.find(b=>b.id===STATE.equipped.ball)?.color || '#fff';
+    this.paddleColor = paddleColor; this.ballColor = ballColor;
+    this.trail = [];
+
+    this.p1 = {x:24, y:this.H/2-45, w:14, h:90, vy:0};
+    this.p2 = {x:this.W-38, y:this.H/2-45, w:14, h:90, vy:0};
+    this.resetBall(Math.random()<0.5?1:-1);
+
+    this.running=true;
+    if(!this._loopStarted){ this._loopStarted=true; requestAnimationFrame(this.loop.bind(this)); }
+    this.showCountdown();
+
+    if(this.isNetworked){
+      this._netSendInt = setInterval(()=>{
+        if(!Net.socket || !this.matchId || this.over) return;
+        if(this.isHost){
+          Net.socket.emit('match:state', {matchId:this.matchId, payload:{
+            p1y:this.p1.y, p2y:this.p2.y, ballx:this.ball.x, bally:this.ball.y, scoreP1:this.scoreP1, scoreP2:this.scoreP2
+          }});
+        } else {
+          Net.socket.emit('match:state', {matchId:this.matchId, payload:{ paddleY:this.p1.y }});
+        }
+      }, 55);
+    }
+  },
+
+  // Called when a state packet arrives from the other player over the socket relay
+  onRemoteState(payload){
+    if(!this.isNetworked) return;
+    if(this.isHost){
+      // guest only ever sends their own paddle position
+      if(typeof payload.paddleY === 'number') this.remoteOpponentY = payload.paddleY;
+    } else {
+      // host sends the full authoritative match state; mirror it for our (guest) viewpoint
+      this.remoteState = payload;
+      const prevP1 = this.scoreP1, prevP2 = this.scoreP2;
+      this.scoreP1 = payload.scoreP2; // my score
+      this.scoreP2 = payload.scoreP1; // opponent score
+      if(this.scoreP1!==prevP1 || this.scoreP2!==prevP2){
+        Sound.score();
+        document.getElementById('hudP1Score').textContent = this.scoreP1;
+        document.getElementById('hudP2Score').textContent = this.scoreP2;
+        if(!this.over && (this.scoreP1>=this.targetScore || this.scoreP2>=this.targetScore)) this.endMatch();
+      }
+    }
+  },
+  onRemoteScore(){ /* reserved: scores are carried inside match:state for this build */ },
+  forfeitWin(){
+    if(this.over) return;
+    if(this.scoreP1 < this.targetScore) this.scoreP1 = this.targetScore;
+    this.endMatch();
+  },
+
+  showCountdown(){
+    const ov = document.getElementById('gameOverlayMsg');
+    ov.classList.add('show');
+    const animMeta = SHOP_CATALOG.animations.find(a=>a.id===this.animationId);
+    document.getElementById('overlaySub').textContent = (animMeta && animMeta.id!=='anim_none') ? `${animMeta.icon} ${animMeta.name}` : '';
+    document.getElementById('overlayButtons').innerHTML='';
+    let n=3;
+    document.getElementById('overlayTitle').textContent = n;
+    this.frozen = true;
+    const int = setInterval(()=>{
+      n--;
+      if(n>0){ document.getElementById('overlayTitle').textContent=n; Sound.click(); }
+      else { clearInterval(int); ov.classList.remove('show'); this.frozen=false; Sound.beep(500,.1,'square',.15); }
+    },700);
+  },
+
+  resetBall(dir){
+    this.ball = {x:this.W/2, y:this.H/2, vx: 5.2*dir, vy:(Math.random()*4-2), r:8, speedCap:13};
+    this.rallyHits=0;
+    this.trail = [];
+  },
+
+  togglePause(){
+    if(this.over) return;
+    this.paused = !this.paused;
+    const ov = document.getElementById('gameOverlayMsg');
+    if(this.paused){
+      ov.classList.add('show');
+      document.getElementById('overlayTitle').textContent='Paused';
+      document.getElementById('overlaySub').textContent='';
+      document.getElementById('overlayButtons').innerHTML = `<button class="btn primary" onclick="Game.togglePause()">Resume</button>
+        <button class="btn ghost" style="margin-left:8px;" onclick="Game.quit()">Quit Match</button>`;
+    } else { ov.classList.remove('show'); }
+  },
+
+  quit(){
+    this.running=false; this.over=true;
+    clearInterval(this._netSendInt);
+    if(this.isNetworked && Net.socket && this.matchId) Net.socket.emit('match:end', {matchId:this.matchId});
+    document.getElementById('gameOverlayMsg').classList.remove('show');
+    Nav.go(this.mode==='campaign'?'levels': this.mode==='online'?'online': this.mode==='tournament'?'play':'offline');
+  },
+
+  loop(ts){
+    if(this.running && !this.paused && !this.frozen && !this.over) this.update();
+    this.render();
+    requestAnimationFrame(this.loop.bind(this));
+  },
+
+  update(){
+    const p1 = this.p1, p2 = this.p2, ball = this.ball;
+    // Player 1 (the local human) is always controlled directly, on both ends of a network match
+    const invert = STATE.settings.invert ? -1 : 1;
+    if(this.pointerY!=null){ p1.y += (this.pointerY - (p1.y+p1.h/2)) * 0.35 * invert; }
+    if(this.keys['ArrowUp']||this.keys['w']) p1.y -= 8*invert;
+    if(this.keys['ArrowDown']||this.keys['s']) p1.y += 8*invert;
+    p1.y = Math.max(0, Math.min(this.H-p1.h, p1.y));
+
+    if(this.isNetworked && !this.isHost){
+      // Guest: the host is authoritative for ball + opponent paddle. Just mirror what we've received.
+      if(this.remoteState){
+        p2.y = this.remoteState.p1y;
+        ball.x = this.W - this.remoteState.ballx;
+        ball.y = this.remoteState.bally;
+      }
+      return; // no local physics — host owns the simulation
+    }
+
+    // Host / offline / campaign / tournament: run the real physics simulation.
+    if(this.isNetworked && this.isHost){ p2.y = Math.max(0, Math.min(this.H-p2.h, this.remoteOpponentY)); }
+    else { this.updateAI(p2, ball); }
+
+    // Ball physics
+    ball.x += ball.vx; ball.y += ball.vy;
+    if(ball.y-ball.r<0){ ball.y=ball.r; ball.vy*=-1; Sound.wall(); }
+    if(ball.y+ball.r>this.H){ ball.y=this.H-ball.r; ball.vy*=-1; Sound.wall(); }
+
+    // paddle collisions
+    if(ball.vx<0 && ball.x-ball.r<=p1.x+p1.w && ball.x-ball.r>=p1.x-6 && ball.y>=p1.y && ball.y<=p1.y+p1.h){
+      this.handleHit(p1, ball, 1);
+    }
+    if(ball.vx>0 && ball.x+ball.r>=p2.x && ball.x+ball.r<=p2.x+p2.w+6 && ball.y>=p2.y && ball.y<=p2.y+p2.h){
+      this.handleHit(p2, ball, -1);
+    }
+
+    // scoring
+    if(ball.x < -20){ this.score(2); }
+    if(ball.x > this.W+20){ this.score(1); }
+
+    // ball trail (used by the render step for the equipped effect)
+    if(this.effectId && this.effectId!=='effect_none'){
+      if(!this.trail) this.trail=[];
+      this.trail.push({x:ball.x, y:ball.y});
+      if(this.trail.length>16) this.trail.shift();
+    } else if(this.trail && this.trail.length){ this.trail.length=0; }
+  },
+
+  handleHit(paddle, ball, dirSign){
+    this.rallyHits++;
+    this.longestRally = Math.max(this.longestRally, this.rallyHits);
+    const relative = (ball.y - (paddle.y+paddle.h/2)) / (paddle.h/2); // -1..1
+    const speed = Math.min(ball.speedCap, Math.hypot(ball.vx, ball.vy) * 1.045 + 0.15);
+    const angle = relative * (Math.PI/3.2);
+    ball.vx = dirSign * Math.cos(angle) * speed;
+    ball.vy = Math.sin(angle) * speed + paddle.vy*0.18;
+    ball.x = paddle===this.p1 ? paddle.x+paddle.w+ball.r+1 : paddle.x-ball.r-1;
+    if(speed > 9){
+      this.matchSmashes++; Missions.record('sessionSmashes');
+      if(this.animationId==='anim_smash') this.showSmashFlash();
+    }
+    Sound.hit();
+  },
+
+  showSmashFlash(){
+    const holder = document.getElementById('gameCanvasHolder');
+    const el = document.createElement('div');
+    el.textContent = '💥 SMASH!';
+    el.style.cssText = 'position:absolute; left:50%; top:38%; transform:translate(-50%,-50%) scale(0.6); font-family:Teko,sans-serif; font-size:44px; font-weight:700; color:#ff4757; text-shadow:0 0 16px rgba(255,71,87,.8); z-index:8; pointer-events:none; opacity:0; transition:transform .25s ease, opacity .25s ease;';
+    holder.appendChild(el);
+    requestAnimationFrame(()=>{ el.style.opacity='1'; el.style.transform='translate(-50%,-50%) scale(1.1)'; });
+    setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translate(-50%,-50%) scale(1.4)'; setTimeout(()=>el.remove(), 250); }, 350);
+  },
+
+  updateAI(p2, ball){
+    const diffCfg = {
+      easy:{reaction:0.055, error:60, maxSpeed:5.2},
+      medium:{reaction:0.09, error:32, maxSpeed:7.2},
+      hard:{reaction:0.14, error:14, maxSpeed:9.4},
+      insane:{reaction:0.22, error:4, maxSpeed:12}
+    }[this.aiDifficulty] || {reaction:0.09,error:32,maxSpeed:7.2};
+    if(!this._aiErrOffset || Math.random()<0.01) this._aiErrOffset = (Math.random()*2-1)*diffCfg.error;
+    let targetY = ball.y + this._aiErrOffset - p2.h/2;
+    if(ball.vx < 0){ targetY = this.H/2 - p2.h/2; } // drift to center when ball moving away
+    const dy = targetY - p2.y;
+    const move = Math.max(-diffCfg.maxSpeed, Math.min(diffCfg.maxSpeed, dy*diffCfg.reaction));
+    p2.vy = move;
+    p2.y += move;
+    p2.y = Math.max(0, Math.min(this.H-p2.h, p2.y));
+  },
+
+  score(who){
+    Sound.score();
+    if(who===1){ this.scoreP1++; Missions.record('sessionPoints',1); }
+    else { this.scoreP2++; }
+    document.getElementById('hudP1Score').textContent = this.scoreP1;
+    document.getElementById('hudP2Score').textContent = this.scoreP2;
+    if(this.scoreP1>=this.targetScore || this.scoreP2>=this.targetScore){
+      this.endMatch();
+    } else {
+      this.resetBall(who===1?1:-1);
+      this.frozen=true; setTimeout(()=>{ this.frozen=false; }, 500);
+    }
+  },
+
+  async endMatch(){
+    this.running=false; this.over=true;
+    clearInterval(this._netSendInt);
+    if(this.isNetworked && Net.socket && this.matchId) Net.socket.emit('match:end', {matchId:this.matchId});
+    const win = this.scoreP1 > this.scoreP2;
+    const ov = document.getElementById('gameOverlayMsg');
+    ov.classList.add('show');
+    if(win){
+      document.getElementById('overlayTitle').innerHTML = `<span class="win-banner">WIN!</span>`;
+      spawnConfetti(ov);
+    } else {
+      document.getElementById('overlayTitle').textContent = 'Defeat';
+    }
+    document.getElementById('overlaySub').textContent = `${this.scoreP1} — ${this.scoreP2}`;
+    if(win && this.animationId && this.animationId!=='anim_none'){
+      const meta = SHOP_CATALOG.animations.find(a=>a.id===this.animationId);
+      if(meta) document.getElementById('overlaySub').textContent += `   ${meta.icon} ${meta.name}`;
+    }
+    Sound[win?'win':'lose']();
+
+    // stats
+    STATE.stats.matchesPlayed++;
+    STATE.stats.totalPoints += this.scoreP1;
+    Missions.record('sessionMatches');
+    let objectiveOk = true;
+    if(win){
+      STATE.stats.wins++; STATE.stats.winStreak++;
+      STATE.stats.bestStreak = Math.max(STATE.stats.bestStreak, STATE.stats.winStreak);
+      Missions.record('sessionWins'); Missions.record('sessionStreak', STATE.stats.winStreak);
+      if(this.scoreP2===0) STATE.stats.perfectGames = (STATE.stats.perfectGames||0)+1;
+      STATE.rating += 18 + Math.floor(Math.random()*8);
+    } else {
+      STATE.stats.losses++; STATE.stats.winStreak=0;
+      STATE.rating = Math.max(400, STATE.rating - (12+Math.floor(Math.random()*6)));
+    }
+    const opponentName = document.getElementById('hudP2Name').textContent;
+    STATE.matchHistory.push({opponent:opponentName, win, score:this.scoreP1+'-'+this.scoreP2, mode:this.mode, date:Date.now()});
+    if(STATE.matchHistory.length>50) STATE.matchHistory = STATE.matchHistory.slice(-50);
+
+    let xpGain = win ? 90 : 35;
+    xpGain += Math.round(this.longestRally*1.2);
+
+    let buttons = `<button class="btn primary" onclick="Nav.go('${this.mode==='campaign'?'levels':this.mode==='tournament'?'play':this.mode}')">Continue</button>`;
+
+    if(this.mode==='campaign'){
+      const lv = this.currentLevel;
+      if(win){
+        objectiveOk = this.checkLevelObjective(lv);
+        let stars = 1;
+        if(objectiveOk) stars=2;
+        if(objectiveOk && (this.scoreP1-this.scoreP2)>=4) stars=3;
+        if(objectiveOk){
+          const already = STATE.campaign.cleared[lv.id];
+          STATE.campaign.cleared[lv.id]=true;
+          STATE.campaign.stars[lv.id] = Math.max(STATE.campaign.stars[lv.id]||0, stars);
+          if(!already){ STATE.stats.levelsCleared = (STATE.stats.levelsCleared||0)+1; STATE.coins += lv.reward.coins; STATE.gems += lv.reward.gems||0; xpGain += lv.reward.xp; }
+          document.getElementById('overlaySub').textContent += `  ·  ${'★'.repeat(stars)}${'☆'.repeat(3-stars)}`;
+          buttons = `<button class="btn primary" onclick="Nav.go('levels')">Back to Levels</button>` + (CAMPAIGN_LEVELS.find(l=>l.id===lv.id+1) ? ` <button class="btn accent" style="margin-left:8px;" onclick="Levels.play(${lv.id+1})">Next Level →</button>` : '');
+        } else {
+          document.getElementById('overlayTitle').textContent = 'Objective Missed';
+          document.getElementById('overlaySub').textContent = `You won ${this.scoreP1}-${this.scoreP2} but didn't meet: "${lv.objective}"`;
+          buttons = `<button class="btn primary" onclick="Levels.play(${lv.id})">Retry</button> <button class="btn ghost" style="margin-left:8px;" onclick="Nav.go('levels')">Back</button>`;
+        }
+      } else {
+        buttons = `<button class="btn primary" onclick="Levels.play(${lv.id})">Retry</button> <button class="btn ghost" style="margin-left:8px;" onclick="Nav.go('levels')">Back</button>`;
+      }
+    }
+
+    if(this.mode==='tournament'){
+      buttons = win ? `<button class="btn accent" onclick="Tournament.advance()">${Tournament.round<3?'Next Round →':'Claim Champion Reward'}</button>`
+                    : `<button class="btn ghost" onclick="Tournament.fail()">Exit Tournament</button>`;
+    }
+
+    document.getElementById('overlayButtons').innerHTML = buttons;
+
+    await Progression.addXp(xpGain, win?'Match Win':'Match Played');
+    LB.push();
+    Achievements.check();
+    Save.now();
+  },
+
+  checkLevelObjective(lv){
+    switch(lv.type){
+      case 'win': return true;
+      case 'marginwin': return (this.scoreP1-this.scoreP2)>=3;
+      case 'clean': return this.scoreP2<=4;
+      case 'smash': return this.matchSmashes>=3;
+      case 'win11': return this.targetScore===11;
+      case 'speed': return this.longestRally>=6;
+      case 'longrally': return this.longestRally>=10;
+      case 'hard': return true;
+      case 'deuce': return Math.abs(this.scoreP1-this.scoreP2)===2;
+      case 'insane': return true;
+      default: return true;
+    }
+  },
+
+  render(){
+    const ctx = this.ctx, W=this.W, H=this.H;
+    ctx.clearRect(0,0,W,H);
+    // arena bg
+    const grd = ctx.createLinearGradient(0,0,0,H);
+    grd.addColorStop(0, this.shade(this.arenaColor, -60));
+    grd.addColorStop(1, this.shade(this.arenaColor, -85));
+    ctx.fillStyle = grd; ctx.fillRect(0,0,W,H);
+    this.drawArenaDecoration(ctx, W, H);
+    // table border
+    ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=4; ctx.strokeRect(6,6,W-12,H-12);
+    // net
+    ctx.setLineDash([10,10]); ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke(); ctx.setLineDash([]);
+    // paddles
+    this.drawPaddle(this.p1, this.paddleColor);
+    this.drawPaddle(this.p2, '#dfe4ee');
+    // ball trail (equipped effect)
+    this.drawTrail(ctx);
+    // ball
+    ctx.beginPath(); ctx.fillStyle = this.ballColor; ctx.shadowColor=this.ballColor; ctx.shadowBlur=12;
+    ctx.arc(this.ball.x, this.ball.y, this.ball.r, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+  },
+  drawTrail(ctx){
+    if(!this.trail || !this.trail.length || !this.effectId || this.effectId==='effect_none') return;
+    const n = this.trail.length;
+    for(let i=0;i<n;i++){
+      const p = this.trail[i];
+      const t = (i+1)/n; // 0 (oldest) .. 1 (newest)
+      const r = this.ball.r * (0.25 + t*0.6);
+      let color;
+      if(this.effectId==='effect_sparkle') color = `rgba(255,226,122,${t*0.5})`;
+      else if(this.effectId==='effect_lightning') color = `rgba(255,230,77,${t*0.6})`;
+      else if(this.effectId==='effect_rainbow') color = `hsla(${(i*24)%360},90%,65%,${t*0.55})`;
+      else color = `rgba(255,255,255,${t*0.3})`;
+      ctx.beginPath(); ctx.fillStyle = color;
+      ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.fill();
+    }
+  },
+  drawArenaDecoration(ctx, W, H){
+    const t = Date.now()/1000;
+    if(this.arenaId==='arena_space' || this.arenaId==='arena_night'){
+      (this._starfield||[]).forEach(s=>{
+        const twinkle = 0.4 + 0.6*Math.abs(Math.sin(t*1.2 + s.phase));
+        ctx.beginPath(); ctx.fillStyle = `rgba(255,255,255,${twinkle*0.8})`;
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+      });
+    } else if(this.arenaId==='arena_beach'){
+      ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=2;
+      for(let i=0;i<4;i++){
+        const y = H - 18 - i*14;
+        ctx.beginPath();
+        for(let x=0;x<=W;x+=20){ const yy = y + Math.sin(x*0.05 + t*1.5 + i)*4; x===0?ctx.moveTo(x,yy):ctx.lineTo(x,yy); }
+        ctx.stroke();
+      }
+    } else if(this.arenaId==='arena_neonarena'){
+      const pulse = 0.15 + 0.1*Math.abs(Math.sin(t*2));
+      ctx.strokeStyle = `rgba(216,31,174,${pulse})`; ctx.lineWidth=1;
+      for(let x=0;x<W;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+      for(let y=0;y<H;y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    } else if(this.arenaId==='arena_royal'){
+      ctx.strokeStyle='rgba(245,184,65,.18)'; ctx.lineWidth=1;
+      for(let x=-H;x<W;x+=30){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke(); }
+    }
+  },
+  drawPaddle(p, color){
+    const ctx=this.ctx;
+    ctx.fillStyle=color; ctx.shadowColor=color; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x,p.y,p.w,p.h,6) : ctx.rect(p.x,p.y,p.w,p.h);
+    ctx.fill(); ctx.shadowBlur=0;
+  },
+  shade(hex, amt){
+    try{
+      let c = hex.replace('#','');
+      if(c.length===3) c = c.split('').map(x=>x+x).join('');
+      const num = parseInt(c,16);
+      let r=(num>>16)+amt, g=((num>>8)&0xff)+amt, b=(num&0xff)+amt;
+      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+      return `rgb(${r},${g},${b})`;
+    }catch(e){ return '#0a1120'; }
+  }
+};
+
+/* ---------------- Boot ---------------- */
+Nav.init();
+Game.init();
+Auth.showTab('login');
+Auth.tryAutoLogin().then(()=>{
+  // If we just came back from a Safepay payment redirect, re-sync the account
+  // (gems are credited by the server-side webhook, not by this page) and
+  // let the player know what happened.
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('payment')==='complete' && STATE){
+    setTimeout(async ()=>{
+      try{
+        const data = await apiCall('/api/me','GET',null,true);
+        STATE.gems = data.player.gems; STATE.coins = data.player.coins;
+        UI.renderTop(); Shop.renderVip();
+        toast('Payment received — your gems have been credited!', true);
+      }catch(e){}
+    }, 1200); // small delay: gives the webhook a moment to arrive first
+  } else if(params.get('payment')==='cancelled'){
+    toast('Payment cancelled — no charge was made.');
+  }
+  if(params.get('payment')){
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+});
+
+// periodic autosave + leaderboard refresh while playing
+setInterval(()=>{ if(STATE) Save.queue(); }, 20000);
+window.addEventListener('beforeunload', ()=>{ if(STATE) Save.now(); });
+</script>
+</body>
+</html>
